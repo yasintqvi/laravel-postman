@@ -18,6 +18,6 @@
             "email": "mrtqvi@yahoo.com"
         }
     ],
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }
