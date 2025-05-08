@@ -1,0 +1,22 @@
+{
+    "name": "yasin_tgh/laravel-postman",
+    "type": "library",
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "symfony/console": "^6.0|^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "YasinTgh\\LaravelPostman\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "yasin taghavi",
+            "email": "mrtqvi@yahoo.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
