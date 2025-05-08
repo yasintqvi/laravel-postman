@@ -1,5 +1,6 @@
 {
     "name": "yasin_tgh/laravel-postman",
+    "description": "A powerful package to automatically generate Postman collections from your Laravel routes with intelligent organization and rich documentation capabilities.",
     "type": "library",
     "require": {
         "php": "^8.1",
