@@ -1,26 +1,79 @@
 <?php
 
 return [
-    'api' => [
-        'name' => env('APP_NAME', 'Laravel API'),
-        'description' => env('API_DESCRIPTION', 'Laravel API Documentation'),
-        'base_url' => env('APP_URL', 'http://localhost'),
-    ],
+    /*
+    |--------------------------------------------------------------------------
+    | API Basic Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Core settings for the API documentation
+    |
+    */
+    'name' => env('APP_NAME', 'Laravel API'),
+    'description' => env('API_DESCRIPTION', 'API Documentation'),
+    'base_url' => env('APP_URL', 'http://localhost'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Route Filtering Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Define which routes should be included/excluded from documentation
+    |
+    */
     'routes' => [
+        // Base prefix for API routes (e.g. 'api' for routes like 'api/users')
         'prefix' => 'api',
-        'path' => 'routes/api.php', // 'Modules/*/routes/api.php'
+
+        // Routes to explicitly include
+        'include' => [
+            // URI patterns to include (supports wildcards)
+            'patterns' => [],
+
+            // Only routes with these middleware
+            'middleware' => [],
+
+            // Only routes from these controllers
+            'controllers' => [],
+        ],
+
+        // Routes to explicitly exclude
+        'exclude' => [
+            // URI patterns to exclude (supports wildcards)
+            'patterns' => [],
+
+            // Exclude routes with these middleware
+            'middleware' => [],
+
+            // Exclude routes from these controllers
+            'controllers' => [],
+        ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Documentation Structure
+    |--------------------------------------------------------------------------
+    |
+    | How the documentation should be organized in Postman
+    |
+    */
     'structure' => [
         'folders' => [
-            'strategy' => 'prefix', // prefix/controller
+            // Grouping strategy: 'prefix', 'controller', or 'module'
+            'strategy' => 'prefix',
+
+            // Custom name mapping for folders
             'mapping' => [
-                // for example 'user' => 'User'
+                // Example: 'admin' => 'Administration'
             ],
         ],
+
         'name' => [
+            // Naming strategy for requests
             'strategy' => 'module_verb_status',
+
+            // Available naming patterns
             'available_strategies' => [
                 'simple' => '{method} {uri}',
                 'controller' => '{controller}@{method}',
@@ -30,9 +83,32 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Default Headers
+    |--------------------------------------------------------------------------
+    |
+    | Headers to include with every request
+    |
+    */
     'headers' => [
         'Accept' => 'application/json',
         'Content-Type' => 'application/json',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Output Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Where and how to save the generated documentation
+    |
+    */
+    'output' => [
+        // Storage path for generated files
+        'path' => storage_path('postman'),
+
+        // File naming pattern (date will be appended)
+        'filename' => 'api_collection',
+    ],
 ];
