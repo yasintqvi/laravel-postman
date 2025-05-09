@@ -3,12 +3,14 @@
 namespace YasinTgh\LaravelPostman\Collections;
 
 use YasinTgh\LaravelPostman\DataTransferObjects\RouteInfoDto;
+use YasinTgh\LaravelPostman\Services\NameGenerator;
 
 class FolderStrategy
 {
     public function __construct(
         protected string $strategy,
-        protected array $config
+        protected array $config,
+        protected NameGenerator $name_generator
     ) {}
 
     public function organize(array $routes): array
@@ -112,7 +114,7 @@ class FolderStrategy
     protected function formatRoute(RouteInfoDto $route): array
     {
         return [
-            'name' => $route->getName(),
+            'name' => $this->name_generator->generate($route),
             'request' => [
                 'method' => $route->methods[0],
                 'url' => [
