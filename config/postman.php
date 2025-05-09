@@ -60,8 +60,9 @@ return [
     */
     'structure' => [
         'folders' => [
-            // Grouping strategy: 'prefix', 'controller', or 'module'
+            // Grouping strategy: 'prefix', 'nested_path', 'controller'
             'strategy' => 'prefix',
+            // 'max_depth' => 2, //  when strategy is nested_path 
 
             // Custom name mapping for folders
             'mapping' => [
