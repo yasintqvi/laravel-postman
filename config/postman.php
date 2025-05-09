@@ -72,14 +72,13 @@ return [
 
         'name' => [
             // Naming strategy for requests
-            'strategy' => 'module_verb_status',
+            'strategy' => 'custom',
 
             // Available naming patterns
             'available_strategies' => [
-                'simple' => '{method} {uri}',
-                'controller' => '{controller}@{method}',
-                'module_verb' => '[{module}] {verb} {noun}',
-                'module_verb_status' => '[{module}] {verb} {noun} ({status})',
+                'simple' => '[{method}] {uri}',
+                'controller' => '{controller}@{action}',
+                'custom' => '[{method}] {action} {uri}'
             ],
         ],
     ],

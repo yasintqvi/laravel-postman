@@ -9,6 +9,7 @@ use YasinTgh\LaravelPostman\Collections\Builder;
 use YasinTgh\LaravelPostman\Collections\FolderStrategy;
 use YasinTgh\LaravelPostman\Commands\GeneratePostmanDocs;
 use YasinTgh\LaravelPostman\Contracts\RouteAnalyzerInterface;
+use YasinTgh\LaravelPostman\Services\NameGenerator;
 use YasinTgh\LaravelPostman\Services\PostmanFormatter;
 use YasinTgh\LaravelPostman\Services\RouteAnalyzer;
 
@@ -29,9 +30,16 @@ class PostmanServiceProvider extends ServiceProvider
             return new Builder(
                 new FolderStrategy(
                     $app->make(Config::class)->get('postman.structure.folders.strategy', 'prefix'),
-                    $app->make(Config::class)->get('postman', [])
+                    $app->make(Config::class)->get('postman', []),
+                    $app->make(NameGenerator::class)
                 ),
                 $app->make(Config::class)->get('postman', [])
+            );
+        });
+
+        $this->app->bind(NameGenerator::class, function ($app) {
+            return new NameGenerator(
+                $app->make(Config::class)->get('postman', []),
             );
         });
 
