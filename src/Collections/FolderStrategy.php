@@ -15,6 +15,7 @@ class FolderStrategy
     {
         return match ($this->strategy) {
             'prefix' => $this->groupByPrefix($routes),
+            'nested_path' => $this->groupByNestedPath($routes),
             'controller' => $this->groupByController($routes),
             default => $this->groupByPrefix($routes)
         };
@@ -34,6 +35,51 @@ class FolderStrategy
             $groups,
             array_keys($groups)
         );
+    }
+
+    protected function groupByNestedPath(array $routes): array
+    {
+        $maxDepth = $this->config['structure']['folders']['max_depth'] ?? 2;
+        $result = [];
+
+        foreach ($routes as $route) {
+
+            $uriWithoutPrefix = trim(str_replace($this->config['routes']['prefix'], '', $route->uri), "/");
+
+            $uriWithoutSegments = trim(preg_replace('/\{.*?\}/', '', $uriWithoutPrefix), "/");
+
+            $segments = explode('/', $uriWithoutSegments);
+
+            $current = &$result;
+
+            foreach ($segments as $i => $segment) {
+                $isLast = ($i === count($segments) - 1);
+
+                if ($isLast) {
+                    $current[] = $this->formatRoute($route);
+                } elseif ($i < $maxDepth) {
+                    $found = false;
+                    foreach ($current as &$item) {
+                        if (isset($item['name']) && $item['name'] === $segment) {
+                            $current = &$item['item'];
+                            $found = true;
+                            break;
+                        }
+                    }
+
+                    if (!$found) {
+                        $newItem = [
+                            'name' => $segment,
+                            'item' => []
+                        ];
+                        $current[] = $newItem;
+                        $current = &$current[count($current) - 1]['item'];
+                    }
+                }
+            }
+        }
+
+        return $result;
     }
 
     protected function groupByController(array $routes): array
