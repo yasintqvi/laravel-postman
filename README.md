@@ -20,7 +20,7 @@ Automatically generate Postman collections from your Laravel API routes with fle
 Install via Composer:
 
 ```bash
-composer require yasin_tgh/laravel-postman
+composer require --dev yasin_tgh/laravel-postman
 ```
 
 ## 🚀 Basic Usage
