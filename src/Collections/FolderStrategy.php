@@ -55,11 +55,7 @@ class FolderStrategy
             $current = &$result;
 
             foreach ($segments as $i => $segment) {
-                $isLast = ($i === count($segments) - 1);
-
-                if ($isLast) {
-                    $current[] = $this->formatRoute($route);
-                } elseif ($i < $maxDepth) {
+                if ($i < $maxDepth) {
                     $found = false;
                     foreach ($current as &$item) {
                         if (isset($item['name']) && $item['name'] === $segment) {
@@ -76,6 +72,12 @@ class FolderStrategy
                         ];
                         $current[] = $newItem;
                         $current = &$current[count($current) - 1]['item'];
+                    }
+
+                    $isLast = ($i === count($segments) - 1);
+
+                    if ($isLast) {
+                        $current[] = $this->formatRoute($route);
                     }
                 }
             }
