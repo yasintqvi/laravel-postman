@@ -13,7 +13,7 @@ class GeneratePostmanDocs extends Command
 
     public function handle(
         RouteAnalyzerInterface $analyzer,
-        PostmanFormatter $formatter
+        PostmanFormatter $formatter,
     ) {
         $routes = $analyzer->analyze();
         $collection = $formatter->format($routes);
