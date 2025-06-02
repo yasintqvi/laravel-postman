@@ -72,7 +72,7 @@ return [
 
         'name' => [
             // Naming strategy for requests
-            'strategy' => 'custom',
+            'strategy' => 'simple',
 
             // Available naming patterns
             'available_strategies' => [
