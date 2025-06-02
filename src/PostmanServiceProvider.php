@@ -9,6 +9,7 @@ use YasinTgh\LaravelPostman\Collections\Builder;
 use YasinTgh\LaravelPostman\Collections\FolderStrategy;
 use YasinTgh\LaravelPostman\Commands\GeneratePostmanDocs;
 use YasinTgh\LaravelPostman\Contracts\RouteAnalyzerInterface;
+use YasinTgh\LaravelPostman\Services\AuthHandler;
 use YasinTgh\LaravelPostman\Services\NameGenerator;
 use YasinTgh\LaravelPostman\Services\PostmanFormatter;
 use YasinTgh\LaravelPostman\Services\RouteAnalyzer;
@@ -19,14 +20,14 @@ class PostmanServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/postman.php', 'postman');
 
-        $this->app->bind(RouteAnalyzerInterface::class, function ($app) {
+        $this->app->singleton(RouteAnalyzerInterface::class, function ($app) {
             return new RouteAnalyzer(
                 $app->make(Router::class),
                 $app->make(Config::class)->get('postman', [])
             );
         });
 
-        $this->app->bind(Builder::class, function ($app) {
+        $this->app->singleton(Builder::class, function ($app) {
             return new Builder(
                 new FolderStrategy(
                     $app->make(Config::class)->get('postman.structure.folders.strategy', 'prefix'),
@@ -37,16 +38,21 @@ class PostmanServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->bind(NameGenerator::class, function ($app) {
+        $this->app->singleton(NameGenerator::class, function ($app) {
             return new NameGenerator(
                 $app->make(Config::class)->get('postman', []),
             );
         });
 
-        $this->app->bind(PostmanFormatter::class, function ($app) {
+        $this->app->singleton(AuthHandler::class, function ($app) {
+            return new AuthHandler($app['config']['postman']);
+        });
+
+        $this->app->singleton(PostmanFormatter::class, function ($app) {
             return new PostmanFormatter(
                 $app->make(Builder::class),
-                $app->make(Config::class)->get('postman', [])
+                $app->make(Config::class)->get('postman', []),
+                $app->make(AuthHandler::class)
             );
         });
     }

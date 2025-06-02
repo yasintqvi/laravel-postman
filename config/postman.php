@@ -72,7 +72,7 @@ return [
 
         'name' => [
             // Naming strategy for requests
-            'strategy' => 'custom',
+            'strategy' => 'simple',
 
             // Available naming patterns
             'available_strategies' => [
@@ -81,6 +81,41 @@ return [
                 'custom' => '[{method}] {action} {uri}'
             ],
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Settings for API authentication documentation and examples
+    |
+    | Determines how authentication is handled in the generated documentation,
+    | including auth type detection, protected route identification, and
+    | example values for documentation purposes.
+    |
+    */
+    'auth' => [
+        // Enable authentication documentation
+        'enabled' => false,
+
+        // Supported: 'bearer', 'basic', 'api_key'
+        'type' => 'bearer',
+
+        // Where to send the auth: 'header' or 'query'
+        'location' => 'header',
+
+        // Default values (use env vars for real values)
+        'default' => [
+            'token' => 'your-access-token',       // For bearer auth
+            'username' => 'user@example.com',      // For basic auth
+            'password' => 'password',              // For basic auth
+            'key_name' => 'X-API-KEY',             // For api_key auth
+            'key_value' => 'your-api-key-here',    // For api_key auth
+        ],
+
+        // Middleware that indicate protected routes
+        'protected_middleware' => ['auth:api'],
     ],
 
     /*

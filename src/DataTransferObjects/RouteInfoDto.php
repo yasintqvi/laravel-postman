@@ -9,7 +9,8 @@ readonly class RouteInfoDto
         public array $methods,
         public ?string $controller = null,
         public ?string $action = null,
-        public array $middleware = []
+        public array $middleware = [],
+        public bool $isProtected
     ) {}
 
     public function getName(): string
