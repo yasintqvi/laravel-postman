@@ -40,7 +40,8 @@ class RouteAnalyzer implements RouteAnalyzerInterface
             methods: $route->methods(),
             controller: $route->getControllerClass(),
             action: $route->getActionMethod(),
-            middleware: $route->gatherMiddleware()
+            middleware: $route->gatherMiddleware(),
+            isProtected: $this->isProtectedRoute($route)
         );
     }
 
@@ -87,5 +88,15 @@ class RouteAnalyzer implements RouteAnalyzerInterface
         }
 
         return true;
+    }
+
+    protected function isProtectedRoute(Route $route): bool
+    {
+        $authMiddleware = $this->config['auth']['protected_middleware'] ?? ['auth'];
+
+        return !empty(array_intersect(
+            $authMiddleware,
+            $route->gatherMiddleware()
+        ));
     }
 }

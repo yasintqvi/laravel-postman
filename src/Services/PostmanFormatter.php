@@ -8,12 +8,16 @@ class PostmanFormatter
 {
     public function __construct(
         protected Builder $builder,
-        protected array $config
+        protected array $config,
+        protected AuthHandler $authHandler
     ) {}
 
     public function format(array $routes): array
     {
-        return $this->builder->build($routes);
+        return $this->builder->build(
+            $routes,
+            $this->authHandler->getAuthConfig()
+        );
     }
 
     public function save(array $collection): string
