@@ -45,7 +45,6 @@ class FolderStrategy
         $result = [];
 
         foreach ($routes as $route) {
-
             $uriWithoutPrefix = trim(str_replace($this->config['routes']['prefix'], '', $route->uri), "/");
 
             $uriWithoutSegments = trim(preg_replace('/\{.*?\}/', '', $uriWithoutPrefix), "/");
@@ -74,9 +73,7 @@ class FolderStrategy
                         $current = &$current[count($current) - 1]['item'];
                     }
 
-                    $isLast = ($i === count($segments) - 1);
-
-                    if ($isLast) {
+                    if ($i === count($segments) - 1) {
                         $current[] = $this->formatRoute($route);
                     }
                 }
@@ -91,7 +88,9 @@ class FolderStrategy
         $groups = [];
 
         foreach ($routes as $route) {
+
             $controllerName = $this->extractControllerName($route->controller);
+
             $groups[$controllerName][] = $this->formatRoute($route);
         }
 
@@ -109,22 +108,109 @@ class FolderStrategy
         }
 
         $baseName = class_basename($controllerClass);
-
         return str_replace('Controller', '', $baseName);
     }
 
     protected function formatRoute(RouteInfoDto $route): array
     {
-        return [
+        $formatted = [
             'name' => $this->name_generator->generate($route),
             'request' => [
                 'method' => $route->methods[0],
+                'header' => $this->buildHeaders($route),
                 'url' => [
                     'raw' => '{{base_url}}/' . $route->uri,
                     'host' => ['{{base_url}}'],
                     'path' => explode('/', $route->uri)
                 ]
             ]
+        ];
+
+        if ($this->isProtectedRoute($route)) {
+            $formatted['request']['auth'] = $this->buildRouteAuth();
+        }
+
+        return $formatted;
+    }
+
+    protected function buildHeaders(RouteInfoDto $route): array
+    {
+        $headers = $this->buildDefaultHeaders();
+
+        if ($this->isProtectedRoute($route) && $this->isApiKeyAuth()) {
+            $headers[] = $this->buildApiKeyHeader();
+        }
+
+        return $headers;
+    }
+
+    protected function buildDefaultHeaders(): array
+    {
+        $headers = [];
+        foreach ($this->config['headers'] ?? [] as $key => $value) {
+            $headers[] = [
+                'key' => $key,
+                'value' => $value,
+                'type' => 'text'
+            ];
+        }
+        return $headers;
+    }
+
+    protected function isProtectedRoute(RouteInfoDto $route): bool
+    {
+        $authMiddleware = $this->config['auth']['protected_middleware'] ?? ['auth'];
+        return !empty(array_intersect($authMiddleware, $route->middleware));
+    }
+
+    protected function buildRouteAuth(): array
+    {
+        $authConfig = $this->config['auth'] ?? [];
+
+        switch ($authConfig['type'] ?? 'bearer') {
+            case 'bearer':
+                return [
+                    'type' => 'bearer',
+                    'bearer' => [
+                        ['key' => 'token', 'value' => '{{auth_token}}']
+                    ]
+                ];
+
+            case 'basic':
+                return [
+                    'type' => 'basic',
+                    'basic' => [
+                        ['key' => 'username', 'value' => '{{auth_username}}'],
+                        ['key' => 'password', 'value' => '{{auth_password}}']
+                    ]
+                ];
+
+            case 'api_key':
+                return [
+                    'type' => 'apikey',
+                    'apikey' => [
+                        ['key' => 'key', 'value' => $authConfig['default']['key_name'] ?? 'X-API-KEY'],
+                        ['key' => 'value', 'value' => '{{api_key}}'],
+                        ['key' => 'in', 'value' => $authConfig['location'] ?? 'header']
+                    ]
+                ];
+
+            default:
+                return [];
+        }
+    }
+
+    protected function isApiKeyAuth(): bool
+    {
+        return ($this->config['auth']['type'] ?? null) === 'api_key';
+    }
+
+    protected function buildApiKeyHeader(): array
+    {
+        return [
+            'key' => $this->config['auth']['default']['key_name'] ?? 'X-API-KEY',
+            'value' => '{{api_key}}',
+            'type' => 'text'
         ];
     }
 }
