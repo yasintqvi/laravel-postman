@@ -26,5 +26,6 @@
                 "YasinTgh\\LaravelPostman\\PostmanServiceProvider"
             ]
         }
-    }
+    },
+    "license": "MIT"
 }
