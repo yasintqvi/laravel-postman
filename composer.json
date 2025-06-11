@@ -24,7 +24,8 @@
         "laravel": {
             "providers": [
                 "YasinTgh\\LaravelPostman\\PostmanServiceProvider"
-            ]
+            ],
+            "logo": "https://i.imgur.com/wt0yMs7.png"
         }
     },
     "license": "MIT"
