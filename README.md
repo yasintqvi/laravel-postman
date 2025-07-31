@@ -51,12 +51,13 @@ Choose how routes are grouped in Postman:
             'admin' => 'Administration' // Custom folder name mapping
         ]
     ],
-    
+  
     'naming_format' => '[{method}] {uri}', // placeholders: {method} {uri} {controller} {action}
 
     'requests' => [
         'default_body_type' => 'raw', // 'raw' or 'formdata'
     ]
+
 ]
 ```
 
