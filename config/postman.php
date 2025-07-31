@@ -70,17 +70,12 @@ return [
             ],
         ],
 
-        'name' => [
-            // Naming strategy for requests
-            'strategy' => 'simple',
-
-            // Available naming patterns
-            'available_strategies' => [
-                'simple' => '[{method}] {uri}',
-                'controller' => '{controller}@{action}',
-                'custom' => '[{method}] {action} {uri}'
-            ],
-        ],
+        /**
+         * Postman request naming format.
+         * Placeholders: {method}, {uri}, {controller}, {action}
+         * Example: '[POST] /users' or 'UserController@store'
+         */
+        'naming_format' => '[{method}] {uri}',
     ],
 
     /*

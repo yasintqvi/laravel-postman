@@ -1,12 +1,6 @@
 
 # Laravel Postman Documentation Generator
 
-<p align="center">
-  <img src="https://i.imgur.com/wt0yMs7.png" alt="Auto-generate Postman collections from Laravel" width="800">
-  <br>
-  <em>Generate Postman docs with authentication, smart grouping, and zero manual work.</em>
-</p>
-
 [![Latest Version](https://img.shields.io/packagist/v/yasin_tgh/laravel-postman.svg?style=flat-square)](https://packagist.org/packages/yasin_tgh/laravel-postman)
 
 Automatically generate Postman collections from your Laravel API routes with flexible organization and authentication support.
@@ -64,14 +58,7 @@ Choose how routes are grouped in Postman:
             'admin' => 'Administration' // Custom folder name mapping
         ]
     ],
-    'name' => [
-        'strategy' => 'simple', // 'simple', 'controller', or 'custom'
-        'available_strategies' => [
-            'simple' => '[{method}] {uri}',
-            'controller' => '{controller}@{action}',
-            'custom' => '[{method}] {action} {uri}'
-        ]
-    ]
+    'naming_format' => '[{method}] {uri}', // placeholders: {method} {uri} {controller} {action}
 ]
 ```
 
