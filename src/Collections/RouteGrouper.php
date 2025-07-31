@@ -4,13 +4,15 @@ namespace YasinTgh\LaravelPostman\Collections;
 
 use YasinTgh\LaravelPostman\DataTransferObjects\RouteInfoDto;
 use YasinTgh\LaravelPostman\Services\NameGenerator;
+use YasinTgh\LaravelPostman\Services\RequestBodyGenerator;
 
-class FolderStrategy
+class RouteGrouper
 {
     public function __construct(
         protected string $strategy,
         protected array $config,
-        protected NameGenerator $name_generator
+        protected NameGenerator $name_generator,
+        protected RequestBodyGenerator $bodyGenerator
     ) {}
 
     public function organize(array $routes): array
@@ -126,12 +128,21 @@ class FolderStrategy
             ]
         ];
 
+        if ($route->formRequest) {
+            $formatted['request']['body'] = $this->bodyGenerator->generateFromRequest(
+                $route->formRequest,
+                $this->config['structure']['requests'],
+                $route->methods[0],
+            );
+        }
+
         if ($this->isProtectedRoute($route)) {
             $formatted['request']['auth'] = $this->buildRouteAuth();
         }
 
         return $formatted;
     }
+
 
     protected function buildHeaders(RouteInfoDto $route): array
     {
