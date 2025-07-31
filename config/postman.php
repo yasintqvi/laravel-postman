@@ -76,6 +76,15 @@ return [
          * Example: '[POST] /users' or 'UserController@store'
          */
         'naming_format' => '[{method}] {uri}',
+
+        /**
+         * Body generation rules
+         * Determines the default format for request bodies in Postman documentation.
+         * Supported: 'raw', 'formdata'
+         */
+        'requests' => [
+            'default_body_type' => 'raw',
+        ]
     ],
 
     /*

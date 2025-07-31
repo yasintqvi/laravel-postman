@@ -2,16 +2,15 @@
 
 namespace YasinTgh\LaravelPostman\Collections;
 
-use YasinTgh\LaravelPostman\Collections\FolderStrategy;
 
 class Builder
 {
     public function __construct(
-        protected FolderStrategy $folderStrategy,
-        protected array $config
+        protected RouteGrouper $routeGrouper,
+        protected array $config,
     ) {}
 
-    public function build(array $routes, array $authConfig): array
+    public function build(array $routes): array
     {
         $variables = [
             ['key' => 'base_url', 'value' => $this->config['base_url']]
@@ -19,15 +18,15 @@ class Builder
 
         $collection = [
             'info' => $this->buildInfo(),
-            'item' => $this->folderStrategy->organize($routes),
+            'item' => $this->routeGrouper->organize($routes),
             'variable' => $variables
         ];
 
-        if ($authConfig['enabled'] ?? false) {
-            $collection['auth'] = $this->buildAuth($authConfig);
+        if ($this->config['auth']['enabled'] ?? false) {
+            $collection['auth'] = $this->buildAuth();
             $collection['variable'] = array_merge(
                 $variables,
-                $this->buildAuthVariables($authConfig)
+                $this->buildAuthVariables()
             );
         }
 
@@ -43,9 +42,11 @@ class Builder
         ];
     }
 
-    protected function buildAuth(array $authConfig): array
+    protected function buildAuth(): array
     {
-        switch ($authConfig['type']) {
+        $authConfig = $this->config['auth']['type'];
+
+        switch ($authConfig) {
             case 'bearer':
                 return [
                     'type' => 'bearer',
@@ -102,9 +103,11 @@ class Builder
         }
     }
 
-    protected function buildAuthVariables(array $authConfig): array
+    protected function buildAuthVariables(): array
     {
         $variables = [];
+
+        $authConfig = $this->config['auth'];
 
         switch ($authConfig['type']) {
             case 'bearer':

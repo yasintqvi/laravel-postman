@@ -2,9 +2,12 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Str;
+use ReflectionMethod;
+use ReflectionParameter;
 use YasinTgh\LaravelPostman\Contracts\RouteAnalyzerInterface;
 use YasinTgh\LaravelPostman\DataTransferObjects\RouteInfoDto;
 
@@ -35,13 +38,24 @@ class RouteAnalyzer implements RouteAnalyzerInterface
 
     protected function parseRoute(Route $route): RouteInfoDto
     {
+        $controllerMethod = new ReflectionMethod($route->getControllerClass(), $route->getActionMethod());
+
+        $formRequestType = collect($controllerMethod->getParameters())
+            ->first(fn($parameter) => $this->isFormRequest($parameter))
+            ?->getType()
+            ?->getName();
+
+        $formRequest = $formRequestType ? new $formRequestType() : null;
+
         return new RouteInfoDto(
-            uri: $route->uri(),
-            methods: $route->methods(),
-            controller: $route->getControllerClass(),
-            action: $route->getActionMethod(),
-            middleware: $route->gatherMiddleware(),
-            isProtected: $this->isProtectedRoute($route)
+            $route->uri(),
+            $route->methods(),
+            $route->getControllerClass(),
+            $route->getActionMethod(),
+            $formRequest,
+            $route->gatherMiddleware(),
+            $this->isProtectedRoute($route),
+
         );
     }
 
@@ -98,5 +112,11 @@ class RouteAnalyzer implements RouteAnalyzerInterface
             $authMiddleware,
             $route->gatherMiddleware()
         ));
+    }
+
+    private function isFormRequest(ReflectionParameter $parameter): bool
+    {
+        $parameterType = $parameter->getType();
+        return $parameterType && !$parameterType->isBuiltin() && is_subclass_of($parameterType->getName(), FormRequest::class);
     }
 }
