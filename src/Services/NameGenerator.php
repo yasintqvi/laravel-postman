@@ -12,8 +12,7 @@ class NameGenerator
 
     public function generate(RouteInfoDto $route): string
     {
-        $strategy = $this->config['structure']['name']['strategy'];
-        $template = $this->config['structure']['name']['available_strategies'][$strategy];
+        $template = $this->config['structure']['naming_format'] ?? '[{method}] {uri}';
 
         return str_replace(
             ['{method}', '{uri}', '{controller}', '{action}'],
