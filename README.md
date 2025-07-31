@@ -153,21 +153,6 @@ Document your API authentication:
 ]
 ```
 
-## 🎯 Advanced Usage
-
-### Custom Request Naming
-Create your own naming pattern:
-```php
-'structure' => [
-    'name' => [
-        'strategy' => 'custom',
-        'available_strategies' => [
-            'custom' => '[{method}] {controller} - {action}'
-        ]
-    ]
-]
-```
-
 ### Environment Variables
 Use `.env` values for sensitive data:
 ```php
