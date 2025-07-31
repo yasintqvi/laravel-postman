@@ -7,19 +7,12 @@ Automatically generate Postman collections from your Laravel API routes with fle
 
 ## Features
 
-- 🚀 Automatic Postman collection generation
-- 🔐 Smart authentication handling for protected routes
-- 🔧 Multiple organization strategies:
-  - By route prefix (e.g., `api/v1`)
-  - By controller namespace
-  - Nested path structure with depth control
-- ⚙️ Customizable request naming patterns
-- 🔍 Advanced route filtering with include/exclude rules
-- 📂 Configurable output location
-- 🔑 Supports multiple auth types:
-  - Bearer tokens
-  - Basic Auth
-  - API Keys
+- Generate Postman collections with one command
+- Automatic request body generation from FormRequest validation rules
+- Multiple organization strategies (route prefix, controller, nested paths)
+- Built-in authentication support (Bearer, Basic Auth, API Keys)
+- Customizable route filtering
+- Environment variable support for sensitive data
 
 ## Installation
 
@@ -34,7 +27,7 @@ Publish the config file:
 php artisan vendor:publish --provider="YasinTgh\LaravelPostman\PostmanServiceProvider" --tag="postman-config"
 ```
 
-## 🚀 Basic Usage
+## Basic Usage
 
 Generate documentation:
 ```bash
@@ -43,7 +36,7 @@ php artisan postman:generate
 
 The collection will be saved to: `storage/postman/api_collection.json`
 
-## 🔧 Configuration Guide
+## Configuration Guide
 
 ### Route Organization
 
@@ -58,7 +51,12 @@ Choose how routes are grouped in Postman:
             'admin' => 'Administration' // Custom folder name mapping
         ]
     ],
+    
     'naming_format' => '[{method}] {uri}', // placeholders: {method} {uri} {controller} {action}
+
+    'requests' => [
+        'default_body_type' => 'raw', // 'raw' or 'formdata'
+    ]
 ]
 ```
 
@@ -115,7 +113,7 @@ Document your API authentication:
 ]
 ```
 
-## 🔐 Authentication Examples
+## Authentication Examples
 
 ### Bearer Token
 ```php
@@ -163,7 +161,7 @@ Use `.env` values for sensitive data:
 ]
 ```
 
-## 📦 Output Example
+## Output Example
 
 Generated Postman collection will:
 - Group routes by your chosen strategy
@@ -186,6 +184,10 @@ Generated Postman collection will:
       "name": "[GET] users",
       "request": {
         "method": "GET",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"user@example.com\",\"password\":\"password123\"}"
+        },
         "auth": {
           "type": "bearer",
           "bearer": [{"key": "token", "value": "{{auth_token}}"}]
@@ -199,5 +201,5 @@ Generated Postman collection will:
 ## 🤝 Contributing
 Pull requests are welcome! For major changes, please open an issue first.
 
-## 📄 License
-[MIT](https://choosealicense.com/licenses/mit/)
+## License
+[MIT](./LICENSE)
