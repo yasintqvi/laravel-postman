@@ -2,14 +2,20 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
+use Closure;
+use Exception;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Str;
+use ReflectionFunction;
+use ReflectionFunctionAbstract;
 use ReflectionMethod;
 use ReflectionParameter;
 use YasinTgh\LaravelPostman\Contracts\RouteAnalyzerInterface;
 use YasinTgh\LaravelPostman\DataTransferObjects\RouteInfoDto;
+use YasinTgh\LaravelPostman\Exceptions\RouteProcessingException;
+use YasinTgh\LaravelPostman\Exceptions\UnsupportedRouteException;
 
 class RouteAnalyzer implements RouteAnalyzerInterface
 {
@@ -38,25 +44,64 @@ class RouteAnalyzer implements RouteAnalyzerInterface
 
     protected function parseRoute(Route $route): RouteInfoDto
     {
-        $controllerMethod = new ReflectionMethod($route->getControllerClass(), $route->getActionMethod());
+        try {
+            $reflector = $this->getRouteReflector($route);
 
-        $formRequestType = collect($controllerMethod->getParameters())
-            ->first(fn($parameter) => $this->isFormRequest($parameter))
-            ?->getType()
-            ?->getName();
+            $formRequestType = collect($reflector->getParameters())
+                ->first(fn($parameter) => $this->isFormRequest($parameter))
+                ?->getType()
+                ?->getName();
 
-        $formRequest = $formRequestType ? new $formRequestType() : null;
 
-        return new RouteInfoDto(
-            $route->uri(),
-            $route->methods(),
-            $route->getControllerClass(),
-            $route->getActionMethod(),
-            $formRequest,
-            $route->gatherMiddleware(),
-            $this->isProtectedRoute($route),
+            $formRequest = $formRequestType ? new $formRequestType() : null;
 
-        );
+            return new RouteInfoDto(
+                uri: $route->uri(),
+                methods: $route->methods(),
+                controller: $route->getControllerClass(),
+                action: $route->getActionMethod(),
+                formRequest: $formRequest,
+                middleware: $route->gatherMiddleware(),
+                isProtected: $this->isProtectedRoute($route)
+            );
+        } catch (UnsupportedRouteException $e) {
+            throw $e;
+        } catch (Exception $e) {
+            throw RouteProcessingException::forReflectionFailure(
+                route: $route,
+                previous: $e,
+                failureType: 'reflection_failure'
+            );
+        }
+    }
+
+    protected function getRouteReflector(Route $route): ReflectionFunctionAbstract
+    {
+        $controller = $route->getControllerClass();
+
+        $method = $route->getActionMethod();
+
+        if ($route->getAction('uses') instanceof Closure) {
+            return new ReflectionFunction($route->getAction('uses'));
+        }
+
+        if (!class_exists($controller)) {
+            throw UnsupportedRouteException::forMissingController(
+                uri: $route->uri(),
+                controller: $controller
+            );
+        }
+
+        $targetMethod = $method === $controller ? '__invoke' : $method;
+        if (!method_exists($controller, $targetMethod)) {
+            throw UnsupportedRouteException::forMissingHandler(
+                uri: $route->uri(),
+                controller: $controller,
+                method: $targetMethod
+            );
+        }
+
+        return new ReflectionMethod($controller, $targetMethod);
     }
 
     protected function shouldIncludeRoute(Route $route): bool
