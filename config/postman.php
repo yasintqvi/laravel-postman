@@ -144,10 +144,12 @@ return [
     |
     */
     'output' => [
+        'driver' => env('POSTMAN_STORAGE_DISK', 'local'),
+
         // Storage path for generated files
-        'path' => storage_path('postman'),
+        'path' => env('POSTMAN_STORAGE_DIR', storage_path('postman')),
 
         // File naming pattern (date will be appended)
-        'filename' => 'api_collection',
+        'filename' => env('POSTMAN_STORAGE_FILE', 'api_collection'),
     ],
 ];

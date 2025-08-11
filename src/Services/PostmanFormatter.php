@@ -2,6 +2,7 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
+use Illuminate\Support\Facades\Storage;
 use YasinTgh\LaravelPostman\Collections\Builder;
 
 class PostmanFormatter
@@ -20,21 +21,19 @@ class PostmanFormatter
 
     public function save(array $collection): string
     {
-        $output_config = $this->config['output'] ?? [];
+        $driver = data_get($this->config, 'output.driver');
+        $path = data_get($this->config, 'output.path');
+        $filename = data_get($this->config, 'output.filename');
 
-        $path = $output_config['path'] ?? storage_path('postman');
+        $disk = Storage::build([
+            'driver' => $driver,
+            'root' => $path,
+        ]);
 
-        if (!file_exists($path)) {
-            mkdir($path, 0755, true);
-        }
+        $contents = json_encode($collection, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        $filePath = $path . '/' . $output_config['filename'];
+        $disk->put($filename, $contents);
 
-        file_put_contents(
-            $filePath,
-            json_encode($collection, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        );
-
-        return $filePath;
+        return $disk->path($filename);
     }
 }
