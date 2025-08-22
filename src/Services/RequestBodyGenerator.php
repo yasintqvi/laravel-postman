@@ -97,7 +97,10 @@ class RequestBodyGenerator
             return [];
         }
 
-
+        if (in_array('numeric', $rules)) {
+            $min = 1;
+            $max = 100;
+            foreach ($rules as $rule) {
                 if (is_string($rule) && str_starts_with($rule, 'min:')) $min = (int)str_replace('min:', '', $rule);
                 if (is_string($rule) && str_starts_with($rule, 'max:')) $max = (int)str_replace('max:', '', $rule);
             }
@@ -117,7 +120,6 @@ class RequestBodyGenerator
             }
 
             if (is_string($rule) && str_starts_with($rule, 'min:')) {
-
                 $minLength = max($minLength, (int)str_replace('min:', '', $rule));
             }
         }
