@@ -120,6 +120,7 @@ class RequestBodyGenerator
             }
 
             if (is_string($rule) && str_starts_with($rule, 'min:')) {
+
                 $minLength = max($minLength, (int)str_replace('min:', '', $rule));
             }
         }
