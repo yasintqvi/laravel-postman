@@ -109,9 +109,14 @@ Document your API authentication:
 
 ```php
 'output' => [
-    'path' => storage_path('postman/docs'), // Custom save path
-    'filename' => 'my_api_collection' // Custom filename
-]
+        'driver' => env('POSTMAN_STORAGE_DISK', 'local'),
+
+        // Storage path for generated files
+        'path' => env('POSTMAN_STORAGE_DIR', storage_path('postman')),
+
+        // File naming pattern (date will be appended)
+        'filename' => env('POSTMAN_STORAGE_FILE', 'api_collection'),
+    ],
 ```
 
 ## Authentication Examples
