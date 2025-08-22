@@ -62,7 +62,7 @@ return [
         'folders' => [
             // Grouping strategy: 'prefix', 'nested_path', 'controller'
             'strategy' => 'nested_path',
-            'max_depth' => 3, //  when strategy is nested_path 
+            'max_depth' => 5, //  when strategy is nested_path 
 
             // Custom name mapping for folders
             'mapping' => [
