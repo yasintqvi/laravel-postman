@@ -62,7 +62,7 @@ return [
         'folders' => [
             // Grouping strategy: 'prefix', 'nested_path', 'controller'
             'strategy' => 'nested_path',
-            'max_depth' => 5, //  when strategy is nested_path 
+            'max_depth' => 5, //  when strategy is nested_path
 
             // Custom name mapping for folders
             'mapping' => [
@@ -120,6 +120,14 @@ return [
 
         // Middleware that indicate protected routes
         'protected_middleware' => ['auth:api'],
+    ],
+
+    'env' => [
+        'default' => [
+            'username' => '',
+            'cell_number' => '',
+            'email' => '',
+        ],
     ],
 
     /*
