@@ -53,12 +53,12 @@ class RequestBodyGenerator
                 $field = str_replace('.*', '', $field);
 
                 if (!in_array($field, array_keys($rules))) {
-                    return [$field => $this->generateFieldValue($field, ['array'] , [])];
+                    return [$field => $this->generateFieldValue($field, ['array'], [])];
                 }
                 return [];
             }
 
-            return [$field => $this->generateFieldValue($field, $rule , [])];
+            return [$field => $this->generateFieldValue($field, $rule, [])];
         })->toArray();
     }
 
@@ -103,8 +103,8 @@ class RequestBodyGenerator
         }
 
         if (Arr::has($requestConfig, 'env')) {
-            $env = Arr::get($requestConfig['env'], 'default',[]);
-            if (Arr::has($env, $field)){
+            $env = Arr::get($requestConfig['env'], 'default', []);
+            if (Arr::has($env, $field)) {
                 return Arr::get($env, $field);
             }
         }
@@ -127,6 +127,11 @@ class RequestBodyGenerator
                     ];
                 }
                 return [];
+            }
+
+            if (str_contains($field, '.')) {
+                $parts = explode('.', $field);
+                $field = $parts[0] . '[' . $parts[1] . ']';
             }
 
             return [
