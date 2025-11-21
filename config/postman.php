@@ -78,13 +78,18 @@ return [
         'naming_format' => '[{method}] {uri}',
 
         /**
-         * Body generation rules
-         * Determines the default format for request bodies in Postman documentation.
-         * Supported: 'raw', 'formdata'
+         * Request body settings:
+         * - default_body_type: 'raw' or 'formdata'
+         * - default_values: preset values applied to generated request fields
          */
         'requests' => [
             'default_body_type' => 'raw',
-        ]
+
+            'default_values' => [
+                // 'email' => 'test@example.com',
+                // 'password' => '123456',
+            ],
+        ],
     ],
 
     /*
@@ -120,14 +125,6 @@ return [
 
         // Middleware that indicate protected routes
         'protected_middleware' => ['auth:api'],
-    ],
-
-    'env' => [
-        'default' => [
-            'username' => '',
-            'cell_number' => '',
-            'email' => '',
-        ],
     ],
 
     /*

@@ -40,7 +40,7 @@ The collection will be saved to: `storage/postman/api_collection.json`
 
 ### Route Organization
 
-Choose how routes are grouped in Postman:
+Configure how API routes are organized in Postman folders, how request names are formatted, and how request bodies are generated, including optional default values for fields.
 
 ```php
 'structure' => [
@@ -54,9 +54,19 @@ Choose how routes are grouped in Postman:
   
     'naming_format' => '[{method}] {uri}', // placeholders: {method} {uri} {controller} {action}
 
+    /**
+    * Request body settings:
+    * - default_body_type: 'raw' or 'formdata'
+    * - default_values: preset values applied to generated fields
+    */
     'requests' => [
-        'default_body_type' => 'raw', // 'raw' or 'formdata'
-    ]
+        'default_body_type' => 'raw',
+        
+        'default_values' => [
+            // 'email' => 'test@example.com',
+            // 'password' => '123456',
+        ],
+    ],
 
 ]
 ```

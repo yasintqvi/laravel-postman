@@ -36,7 +36,7 @@ class RequestBodyGenerator
 
         return match ($bodyType) {
             'raw' => json_encode(
-                $this->generateFromRules($rules),
+                $this->generateFromRules($rules, $requestConfig),
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             ),
             'formdata' => $this->generateFormData($rules, $requestConfig),
@@ -44,27 +44,33 @@ class RequestBodyGenerator
         };
     }
 
-    protected function generateFromRules(array $rules): array
+    protected function generateFromRules(array $rules, array $requestConfig): array
     {
-        return collect($rules)->mapWithKeys(function ($rule, $field) use ($rules) {
+        return collect($rules)->mapWithKeys(function ($rule, $field) use ($rules, $requestConfig) {
 
             if (str_contains($field, '.*')) {
 
                 $field = str_replace('.*', '', $field);
 
                 if (!in_array($field, array_keys($rules))) {
-                    return [$field => $this->generateFieldValue($field, ['array'], [])];
+                    return [$field => $this->generateFieldValue($field, ['array'], $requestConfig)];
                 }
                 return [];
             }
 
-            return [$field => $this->generateFieldValue($field, $rule, [])];
+            return [$field => $this->generateFieldValue($field, $rule, $requestConfig)];
         })->toArray();
     }
 
     protected function generateFieldValue(string $field, array|string $rules, array $requestConfig): mixed
     {
         $rules = is_array($rules) ? $rules : explode('|', $rules);
+
+        $defaultValues = data_get($requestConfig, 'structure.requests.default_values', []);
+
+        if (array_key_exists($field, $defaultValues)) {
+            return $defaultValues[$field];
+        }
 
         if (in_array('email', $rules)) {
             return 'user' . rand(1, 100) . '@example.com';
@@ -77,40 +83,39 @@ class RequestBodyGenerator
         if (in_array('numeric', $rules)) {
             $min = 1;
             $max = 100;
+
             foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'min:')) $min = (int)str_replace('min:', '', $rule);
-                if (is_string($rule) && str_starts_with($rule, 'max:')) $max = (int)str_replace('max:', '', $rule);
+                if (is_string($rule) && str_starts_with($rule, 'min:')) {
+                    $min = (int) str_replace('min:', '', $rule);
+                }
+
+                if (is_string($rule) && str_starts_with($rule, 'max:')) {
+                    $max = (int) str_replace('max:', '', $rule);
+                }
             }
+
             return rand($min, $max);
         }
 
         if (in_array('boolean', $rules)) {
-            return rand(0, 1) === 1;
+            return (bool) rand(0, 1);
         }
 
         $minLength = 5;
 
         foreach ($rules as $rule) {
-
             if ($rule instanceof ValidationRule || $rule instanceof Rule) {
                 continue;
             }
 
             if (is_string($rule) && str_starts_with($rule, 'min:')) {
-
-                $minLength = max($minLength, (int)str_replace('min:', '', $rule));
+                $minLength = max($minLength, (int) str_replace('min:', '', $rule));
             }
         }
 
-        if (Arr::has($requestConfig, 'env')) {
-            $env = Arr::get($requestConfig['env'], 'default', []);
-            if (Arr::has($env, $field)) {
-                return Arr::get($env, $field);
-            }
-        }
-
-        return "{$field} sample value";
+        return '';
     }
+
 
     protected function generateFormData(array $rules, array $requestConfig): array
     {
