@@ -131,7 +131,7 @@ class RouteGrouper
         if ($route->formRequest) {
             $formatted['request']['body'] = $this->bodyGenerator->generateFromRequest(
                 $route->formRequest,
-                $this->config['structure']['requests'],
+                $this->config,
                 $route->methods[0],
             );
         }
