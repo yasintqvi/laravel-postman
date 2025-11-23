@@ -3,12 +3,12 @@
 namespace YasinTgh\LaravelPostman\Services;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Throwable;
 
-class RequestBodyGenerator {
-    public function generateFromRequest(FormRequest $request, array $requestConfig, string $httpMethod): array {
+class RequestBodyGenerator
+{
+    public function generateFromRequest(FormRequest $request, array $requestConfig, string $httpMethod): array
+    {
         $bodyType = $this->getRequestBodyType($requestConfig['structure']['requests']['default_body_type'], $httpMethod);
         return [
             'mode' => $bodyType,
@@ -17,11 +17,13 @@ class RequestBodyGenerator {
         ];
     }
 
-    protected function getRequestBodyType(string $defaultBodyType, string $httpMethod): string {
+    protected function getRequestBodyType(string $defaultBodyType, string $httpMethod): string
+    {
         return $httpMethod === 'POST' && $defaultBodyType === 'formdata' ? 'formdata' : 'raw';
     }
 
-    protected function generateBodyContent(FormRequest $request, string $bodyType, array $requestConfig): array|string|null {
+    protected function generateBodyContent(FormRequest $request, string $bodyType, array $requestConfig): array|string|null
+    {
         try {
             $rules = $request->rules();
         } catch (Throwable $th) {
@@ -38,7 +40,8 @@ class RequestBodyGenerator {
         };
     }
 
-    protected function generateFromRules(array $rules, array $requestConfig): array {
+    protected function generateFromRules(array $rules, array $requestConfig): array
+    {
         $data = [];
 
         foreach ($rules as $field => $rule) {
@@ -48,59 +51,25 @@ class RequestBodyGenerator {
         return $data;
     }
 
-    protected function setNestedValue(&$data, string $field, array|string $rules, array $requestConfig): void {
+    protected function setNestedValue(&$data, string $field, array|string $rules, array $requestConfig): void
+    {
         $rules = is_array($rules) ? $rules : explode('|', $rules);
         $value = $this->generateFieldValue($field, $rules, $requestConfig);
 
         // Handle array notation: field.*.subfield -> field[].subfield
         if (str_contains($field, '.*')) {
-            $parts = explode('.*', $field);
-            $rootField = $parts[0];
-            $remainingPath = $parts[1] ?? '';
-
-            // Initialize root as array if it doesn't exist
-            if (!isset($data[$rootField])) {
-                $data[$rootField] = [];
-            }
-
-            // If there's a remaining path, we need to add to array items
-            if ($remainingPath) {
-                $cleanPath = ltrim($remainingPath, '.');
-
-                // Ensure we have at least one item in the array
-                if (empty($data[$rootField])) {
-                    $data[$rootField][] = [];
-                }
-
-                // Set value in the first array item
-                $this->setNestedValueInArray($data[$rootField][0], $cleanPath, $value);
-            }
+            $this->setArrayNestedValue($data, $field, $value);
         } else {
             // Simple field without array notation
             $this->setNestedValueInArray($data, $field, $value);
         }
     }
 
-    protected function setNestedValueInArray(&$target, string $path, mixed $value): void {
-        $parts = explode('.', $path);
-
-        foreach ($parts as $i => $part) {
-            if ($i === count($parts) - 1) {
-                // Last part - set the value
-                $target[$part] = $value;
-            } else {
-                // Intermediate part - navigate or create
-                if (!isset($target[$part])) {
-                    $target[$part] = [];
-                }
-                $target = &$target[$part];
-            }
-        }
-    }
-
-    protected function generateFieldValue(string $field, array|string $rules, array $requestConfig): mixed {
+    protected function generateFieldValue(string $field, array|string $rules, array $requestConfig): mixed
+    {
         $rules = is_array($rules) ? $rules : explode('|', $rules);
         $defaultValues = data_get($requestConfig, 'structure.requests.default_values', []);
+
 
         if (array_key_exists($field, $defaultValues)) {
             return $defaultValues[$field];
@@ -114,22 +83,36 @@ class RequestBodyGenerator {
             return [];
         }
 
+        if (in_array('integer', $rules)) {
+            $min = 0;
+            $max = 10;
+            foreach ($rules as $rule) {
+                if (is_string($rule) && str_starts_with($rule, 'min:')) {
+                    $min = (int)str_replace('min:', '', $rule);
+                }
+                if (is_string($rule) && str_starts_with($rule, 'max:')) {
+                    $max = (int)str_replace('max:', '', $rule);
+                }
+            }
+            return rand($min, $max);
+        }
+
         if (in_array('numeric', $rules)) {
             $min = 1;
             $max = 100;
             foreach ($rules as $rule) {
                 if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                    $min = (int) str_replace('min:', '', $rule);
+                    $min = (int)str_replace('min:', '', $rule);
                 }
                 if (is_string($rule) && str_starts_with($rule, 'max:')) {
-                    $max = (int) str_replace('max:', '', $rule);
+                    $max = (int)str_replace('max:', '', $rule);
                 }
             }
             return rand($min, $max);
         }
 
         if (in_array('boolean', $rules)) {
-            return (bool) rand(0, 1);
+            return rand(0, 1);
         }
 
         if (in_array('date_format', $rules)) {
@@ -147,14 +130,15 @@ class RequestBodyGenerator {
                 continue;
             }
             if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                $minLength = max($minLength, (int) str_replace('min:', '', $rule));
+                $minLength = max($minLength, (int)str_replace('min:', '', $rule));
             }
         }
 
         return 'sample_text';
     }
 
-    protected function generateDateTimeValue(string $format): string {
+    protected function generateDateTimeValue(string $format): string
+    {
         return match ($format) {
             'H:i' => date('H:i'),
             'Y-m-d' => date('Y-m-d'),
@@ -163,20 +147,99 @@ class RequestBodyGenerator {
         };
     }
 
-    protected function generateFormData(array $rules, array $requestConfig): array {
+    protected function setArrayNestedValue(&$data, string $field, mixed $value): void
+    {
+        // Split by .* to get array levels
+        $parts = explode('.*', $field);
+        $current = &$data;
+
+        foreach ($parts as $index => $part) {
+            if ($index === 0) {
+                // First part - root field
+                if (!isset($current[$part])) {
+                    $current[$part] = [];
+                }
+                $current = &$current[$part];
+            } elseif ($index === count($parts) - 1) {
+                // Last part - set the value
+                $cleanPart = ltrim($part, '.');
+
+                if (empty($current)) {
+                    $current[] = [];
+                }
+
+                if ($cleanPart) {
+                    $this->setNestedValueInArray($current[0], $cleanPart, $value);
+                }
+            } else {
+                // Middle parts - nested arrays
+                $cleanPart = ltrim($part, '.');
+
+                if (empty($current)) {
+                    $current[] = [];
+                }
+
+                if (!isset($current[0][$cleanPart])) {
+                    $current[0][$cleanPart] = [];
+                }
+
+                $current = &$current[0][$cleanPart];
+            }
+        }
+    }
+
+    protected function setNestedValueInArray(&$target, string $path, mixed $value): void
+    {
+        $parts = explode('.', $path);
+
+        foreach ($parts as $i => $part) {
+            if ($i === count($parts) - 1) {
+                // Last part - set the value
+                $target[$part] = $value;
+            } else {
+                // Intermediate part - navigate or create
+                if (!isset($target[$part])) {
+                    $target[$part] = [];
+                }
+                $target = &$target[$part];
+            }
+        }
+    }
+
+    protected function generateFormData(array $rules, array $requestConfig): array
+    {
         $data = $this->generateFromRules($rules, $requestConfig);
         return $this->flattenForFormData($data);
     }
 
-    protected function flattenForFormData(array $data, string $prefix = ''): array {
+    protected function flattenForFormData(array $data, string $prefix = ''): array
+    {
         $result = [];
 
         foreach ($data as $key => $value) {
             $newKey = $prefix ? "{$prefix}[{$key}]" : $key;
 
-            if (is_array($value)) {
-                $result = array_merge($result, $this->flattenForFormData($value, $newKey));
-            } else {
+            if (is_array($value) && !empty($value)) {
+                // Check if it's a sequential array (list) or associative
+                if ($this->isSequentialArray($value)) {
+                    // It's a list - add indices
+                    foreach ($value as $index => $item) {
+                        $indexedKey = "{$newKey}[{$index}]";
+                        if (is_array($item)) {
+                            $result = array_merge($result, $this->flattenForFormData($item, $indexedKey));
+                        } else {
+                            $result[] = [
+                                'key' => $indexedKey,
+                                'value' => $item,
+                                'type' => 'text'
+                            ];
+                        }
+                    }
+                } else {
+                    // It's associative - recurse without indices
+                    $result = array_merge($result, $this->flattenForFormData($value, $newKey));
+                }
+            } elseif (!is_array($value)) {
                 $result[] = [
                     'key' => $newKey,
                     'value' => $value,
@@ -188,7 +251,14 @@ class RequestBodyGenerator {
         return $result;
     }
 
-    protected function getBodyOptions(string $bodyType): array {
+    protected function isSequentialArray(array $array): bool
+    {
+        $keys = array_keys($array);
+        return $keys === range(0, count($array) - 1);
+    }
+
+    protected function getBodyOptions(string $bodyType): array
+    {
         return match ($bodyType) {
             'json' => ['raw' => ['language' => 'json']],
             'formdata' => [],
