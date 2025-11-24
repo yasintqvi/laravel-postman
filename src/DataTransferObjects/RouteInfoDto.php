@@ -9,11 +9,11 @@ class RouteInfoDto
     public function __construct(
         readonly public string $uri,
         readonly public array $methods,
+        readonly public bool $isProtected,
         readonly public ?string $controller = null,
         readonly public ?string $action = null,
         readonly public ?FormRequest $formRequest = null,
         readonly public array $middleware = [],
-        readonly public bool $isProtected,
     ) {}
 
     public function getName(): string
