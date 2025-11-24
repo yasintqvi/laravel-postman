@@ -12,6 +12,7 @@ use ReflectionFunction;
 use ReflectionFunctionAbstract;
 use ReflectionMethod;
 use ReflectionParameter;
+use ReflectionUnionType;
 use YasinTgh\LaravelPostman\Contracts\RouteAnalyzerInterface;
 use YasinTgh\LaravelPostman\DataTransferObjects\RouteInfoDto;
 use YasinTgh\LaravelPostman\Exceptions\RouteProcessingException;
@@ -159,9 +160,21 @@ class RouteAnalyzer implements RouteAnalyzerInterface
         ));
     }
 
-    private function isFormRequest(ReflectionParameter $parameter): bool
+    private function isFormRequest(ReflectionParameter $p): bool
     {
-        $parameterType = $parameter->getType();
-        return $parameterType && !$parameterType->isBuiltin() && is_subclass_of($parameterType->getName(), FormRequest::class);
+        $type = $p->getType();
+        if (!$type) return false;
+
+        $types = $type instanceof ReflectionUnionType
+            ? $type->getTypes()
+            : [$type];
+
+        foreach ($types as $t) {
+            if (!$t->isBuiltin() && is_subclass_of($t->getName(), FormRequest::class)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
