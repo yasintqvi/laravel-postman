@@ -62,7 +62,7 @@ return [
         'folders' => [
             // Grouping strategy: 'prefix', 'nested_path', 'controller'
             'strategy' => 'nested_path',
-            'max_depth' => 5, //  when strategy is nested_path
+            'max_depth' => 10, //  when strategy is nested_path
 
             // Custom name mapping for folders
             'mapping' => [
@@ -84,10 +84,10 @@ return [
          */
         'requests' => [
             'default_body_type' => 'raw',
-
             'default_values' => [
                 // 'email' => 'test@example.com',
                 // 'password' => '123456',
+                // 'otp_code' => '1234',
             ],
         ],
     ],

@@ -2,10 +2,7 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
-use Illuminate\Contracts\Validation\Rule;
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Arr;
 use Throwable;
 
 class RequestBodyGenerator
@@ -13,7 +10,6 @@ class RequestBodyGenerator
     public function generateFromRequest(FormRequest $request, array $requestConfig, string $httpMethod): array
     {
         $bodyType = $this->getRequestBodyType($requestConfig['structure']['requests']['default_body_type'], $httpMethod);
-
         return [
             'mode' => $bodyType,
             $bodyType => $this->generateBodyContent($request, $bodyType, $requestConfig),
@@ -46,27 +42,34 @@ class RequestBodyGenerator
 
     protected function generateFromRules(array $rules, array $requestConfig): array
     {
-        return collect($rules)->mapWithKeys(function ($rule, $field) use ($rules, $requestConfig) {
+        $data = [];
 
-            if (str_contains($field, '.*')) {
+        foreach ($rules as $field => $rule) {
+            $this->setNestedValue($data, $field, $rule, $requestConfig);
+        }
 
-                $field = str_replace('.*', '', $field);
+        return $data;
+    }
 
-                if (!in_array($field, array_keys($rules))) {
-                    return [$field => $this->generateFieldValue($field, ['array'], $requestConfig)];
-                }
-                return [];
-            }
+    protected function setNestedValue(&$data, string $field, array|string $rules, array $requestConfig): void
+    {
+        $rules = is_array($rules) ? $rules : explode('|', $rules);
+        $value = $this->generateFieldValue($field, $rules, $requestConfig);
 
-            return [$field => $this->generateFieldValue($field, $rule, $requestConfig)];
-        })->toArray();
+        // Handle array notation: field.*.subfield -> field[].subfield
+        if (str_contains($field, '.*')) {
+            $this->setArrayNestedValue($data, $field, $value);
+        } else {
+            // Simple field without array notation
+            $this->setNestedValueInArray($data, $field, $value);
+        }
     }
 
     protected function generateFieldValue(string $field, array|string $rules, array $requestConfig): mixed
     {
         $rules = is_array($rules) ? $rules : explode('|', $rules);
-
         $defaultValues = data_get($requestConfig, 'structure.requests.default_values', []);
+
 
         if (array_key_exists($field, $defaultValues)) {
             return $defaultValues[$field];
@@ -80,71 +83,178 @@ class RequestBodyGenerator
             return [];
         }
 
+        if (in_array('integer', $rules)) {
+            $min = 0;
+            $max = 10;
+            foreach ($rules as $rule) {
+                if (is_string($rule) && str_starts_with($rule, 'min:')) {
+                    $min = (int)str_replace('min:', '', $rule);
+                }
+                if (is_string($rule) && str_starts_with($rule, 'max:')) {
+                    $max = (int)str_replace('max:', '', $rule);
+                }
+            }
+            return rand($min, $max);
+        }
+
         if (in_array('numeric', $rules)) {
             $min = 1;
             $max = 100;
-
             foreach ($rules as $rule) {
                 if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                    $min = (int) str_replace('min:', '', $rule);
+                    $min = (int)str_replace('min:', '', $rule);
                 }
-
                 if (is_string($rule) && str_starts_with($rule, 'max:')) {
-                    $max = (int) str_replace('max:', '', $rule);
+                    $max = (int)str_replace('max:', '', $rule);
                 }
             }
-
             return rand($min, $max);
         }
 
         if (in_array('boolean', $rules)) {
-            return (bool) rand(0, 1);
+            return rand(0, 1);
+        }
+
+        if (in_array('date_format', $rules)) {
+            foreach ($rules as $rule) {
+                if (is_string($rule) && str_starts_with($rule, 'date_format:')) {
+                    $format = str_replace('date_format:', '', $rule);
+                    return $this->generateDateTimeValue($format);
+                }
+            }
         }
 
         $minLength = 5;
-
         foreach ($rules as $rule) {
             if ($rule instanceof ValidationRule || $rule instanceof Rule) {
                 continue;
             }
-
             if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                $minLength = max($minLength, (int) str_replace('min:', '', $rule));
+                $minLength = max($minLength, (int)str_replace('min:', '', $rule));
             }
         }
 
-        return '';
+        return 'sample_text';
     }
 
+    protected function generateDateTimeValue(string $format): string
+    {
+        return match ($format) {
+            'H:i' => date('H:i'),
+            'Y-m-d' => date('Y-m-d'),
+            'Y-m-d H:i:s' => date('Y-m-d H:i:s'),
+            default => date($format)
+        };
+    }
+
+    protected function setArrayNestedValue(&$data, string $field, mixed $value): void
+    {
+        // Split by .* to get array levels
+        $parts = explode('.*', $field);
+        $current = &$data;
+
+        foreach ($parts as $index => $part) {
+            if ($index === 0) {
+                // First part - root field
+                if (!isset($current[$part])) {
+                    $current[$part] = [];
+                }
+                $current = &$current[$part];
+            } elseif ($index === count($parts) - 1) {
+                // Last part - set the value
+                $cleanPart = ltrim($part, '.');
+
+                if (empty($current)) {
+                    $current[] = [];
+                }
+
+                if ($cleanPart) {
+                    $this->setNestedValueInArray($current[0], $cleanPart, $value);
+                }
+            } else {
+                // Middle parts - nested arrays
+                $cleanPart = ltrim($part, '.');
+
+                if (empty($current)) {
+                    $current[] = [];
+                }
+
+                if (!isset($current[0][$cleanPart])) {
+                    $current[0][$cleanPart] = [];
+                }
+
+                $current = &$current[0][$cleanPart];
+            }
+        }
+    }
+
+    protected function setNestedValueInArray(&$target, string $path, mixed $value): void
+    {
+        $parts = explode('.', $path);
+
+        foreach ($parts as $i => $part) {
+            if ($i === count($parts) - 1) {
+                // Last part - set the value
+                $target[$part] = $value;
+            } else {
+                // Intermediate part - navigate or create
+                if (!isset($target[$part])) {
+                    $target[$part] = [];
+                }
+                $target = &$target[$part];
+            }
+        }
+    }
 
     protected function generateFormData(array $rules, array $requestConfig): array
     {
-        return collect($rules)->map(function ($rule, $field) use ($rules, $requestConfig) {
-            if (str_contains($field, '.*')) {
+        $data = $this->generateFromRules($rules, $requestConfig);
+        return $this->flattenForFormData($data);
+    }
 
-                $field = str_replace('.*', '', $field);
+    protected function flattenForFormData(array $data, string $prefix = ''): array
+    {
+        $result = [];
 
-                if (!in_array($field, array_keys($rules))) {
-                    return [
-                        'key' => $field,
-                        'value' => $this->generateFieldValue($field, ['array'], $requestConfig),
-                        'type' => 'text'
-                    ];
+        foreach ($data as $key => $value) {
+            $newKey = $prefix ? "{$prefix}[{$key}]" : $key;
+
+            if (is_array($value) && !empty($value)) {
+                // Check if it's a sequential array (list) or associative
+                if ($this->isSequentialArray($value)) {
+                    // It's a list - add indices
+                    foreach ($value as $index => $item) {
+                        $indexedKey = "{$newKey}[{$index}]";
+                        if (is_array($item)) {
+                            $result = array_merge($result, $this->flattenForFormData($item, $indexedKey));
+                        } else {
+                            $result[] = [
+                                'key' => $indexedKey,
+                                'value' => $item,
+                                'type' => 'text'
+                            ];
+                        }
+                    }
+                } else {
+                    // It's associative - recurse without indices
+                    $result = array_merge($result, $this->flattenForFormData($value, $newKey));
                 }
-                return [];
+            } elseif (!is_array($value)) {
+                $result[] = [
+                    'key' => $newKey,
+                    'value' => $value,
+                    'type' => 'text'
+                ];
             }
+        }
 
-            if (str_contains($field, '.')) {
-                $parts = explode('.', $field);
-                $field = $parts[0] . '[' . $parts[1] . ']';
-            }
+        return $result;
+    }
 
-            return [
-                'key' => $field,
-                'value' => $this->generateFieldValue($field, $rule, $requestConfig),
-                'type' => in_array('file', $rule) ? 'file' : 'text'
-            ];
-        })->values()->toArray();
+    protected function isSequentialArray(array $array): bool
+    {
+        $keys = array_keys($array);
+        return $keys === range(0, count($array) - 1);
     }
 
     protected function getBodyOptions(string $bodyType): array
