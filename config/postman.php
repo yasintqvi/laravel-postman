@@ -62,7 +62,7 @@ return [
         'folders' => [
             // Grouping strategy: 'prefix', 'nested_path', 'controller'
             'strategy' => 'nested_path',
-            'max_depth' => 5, //  when strategy is nested_path
+            'max_depth' => 10, //  when strategy is nested_path
 
             // Custom name mapping for folders
             'mapping' => [
@@ -84,10 +84,24 @@ return [
          */
         'requests' => [
             'default_body_type' => 'raw',
-
             'default_values' => [
-                // 'email' => 'test@example.com',
-                // 'password' => '123456',
+                'cell_number' => '09121234567',            
+                'otp_code' => '1234',
+                'shift_days' => [],
+                'shift_days.*.day_of_week' => '0',
+                'shift_days.*.is_holiday' => '1',
+                'shift_days.*.is_midnight' => '0',
+                'shift_days.*.subshifts' => [],
+                'shift_days.*.subshifts.*.start_time' => '09:00',
+                'shift_days.*.subshifts.*.end_time' => '17:00',
+                'shift_days.*.subshifts.*.permitted_start_time' => '08:45',
+                'shift_days.*.subshifts.*.permitted_end_time' => '17:30',
+                'shift_days.*.subshifts.*.start_overtime_time' => '18:00',
+                'shift_days.*.subshifts.*.has_overtime' => '1',
+                'shift_days.*.subshifts.*.start_overtime_after_end' => '0',
+                'shift_days.*.subshifts.*.is_advanced' => '1',
+                'shift_days.*.subshifts.*.coverable_delay' => '0',
+                'shift_days.*.subshifts.*.has_start_overtime' => '0'
             ],
         ],
     ],
