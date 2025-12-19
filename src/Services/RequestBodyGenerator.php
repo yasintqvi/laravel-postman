@@ -51,8 +51,12 @@ class RequestBodyGenerator
         return $data;
     }
 
-    protected function setNestedValue(&$data, string $field, array|string $rules, array $requestConfig): void
+    protected function setNestedValue(&$data, string $field, array|string|object $rules, array $requestConfig): void
     {
+        if (is_object($rules)) {
+            return;
+        }
+
         $rules = is_array($rules) ? $rules : explode('|', $rules);
         $value = $this->generateFieldValue($field, $rules, $requestConfig);
 
