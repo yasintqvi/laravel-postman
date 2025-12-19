@@ -33,7 +33,8 @@ class PostmanServiceProvider extends ServiceProvider
                     $app->make(Config::class)->get('postman.structure.folders.strategy', 'prefix'),
                     $app->make(Config::class)->get('postman', []),
                     $app->make(NameGenerator::class),
-                    $app->make(RequestBodyGenerator::class)
+                    $app->make(RequestBodyGenerator::class),
+                    $app->make(Config::class)->get('postman.structure.requests.default_values', []),
                 ),
                 $app->make(Config::class)->get('postman', [])
             );
