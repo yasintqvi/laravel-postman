@@ -14,9 +14,7 @@ class RouteGrouper
         protected NameGenerator        $name_generator,
         protected RequestBodyGenerator $bodyGenerator,
         public                         $requestConfig,
-    )
-    {
-    }
+    ) {}
 
     public function organize(array $routes): array
     {
@@ -186,9 +184,15 @@ class RouteGrouper
         foreach ($routes as $route) {
             $uriWithoutPrefix = trim(str_replace($this->config['routes']['prefix'], '', $route->uri), "/");
 
-            $uriWithoutSegments = trim(preg_replace('/\{.*?\}/', '', $uriWithoutPrefix), "/");
+            $uriWithoutSegments = preg_replace('/\{.*?\}/', '', $uriWithoutPrefix);
 
-            $segments = explode('/', $uriWithoutSegments);
+            $uriWithoutSegments = trim(preg_replace('/\/+/', '/', $uriWithoutSegments), "/");
+
+            if (empty($uriWithoutSegments)) {
+                $segments = [];
+            } else {
+                $segments = explode('/', $uriWithoutSegments);
+            }
 
             $current = &$result;
 
