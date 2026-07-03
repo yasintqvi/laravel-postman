@@ -124,7 +124,7 @@ class RouteAnalyzer implements RouteAnalyzerInterface
         }
 
         foreach ($this->config['routes']['exclude']['patterns'] as $pattern) {
-            if (Str::is($pattern, $route->uri())) {
+            if (Str::is(trim($pattern, "/"), $route->uri())) {
                 return false;
             }
         }
