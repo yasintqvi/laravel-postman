@@ -66,7 +66,23 @@ class RequestBodyGenerator
         } else {
             // Simple field without array notation
             $this->setNestedValueInArray($data, $field, $value);
+
+            // Laravel's "confirmed" rule validates against a sibling
+            // {field}_confirmation field that never appears as its own key
+            // in rules(), so it has to be synthesized here.
+            if (in_array('confirmed', $rules, true)) {
+                $this->setNestedValueInArray($data, $this->confirmationFieldName($field), $value);
+            }
         }
+    }
+
+    protected function confirmationFieldName(string $field): string
+    {
+        $parts = explode('.', $field);
+        $last = array_pop($parts);
+        $parts[] = "{$last}_confirmation";
+
+        return implode('.', $parts);
     }
 
     protected function generateFieldValue(string $field, array|string $rules, array $requestConfig): mixed
