@@ -10,11 +10,19 @@ class RequestBodyGenerator
     public function generateFromRequest(FormRequest $request, array $requestConfig, string $httpMethod): array
     {
         $bodyType = $this->getRequestBodyType($requestConfig['structure']['requests']['default_body_type'], $httpMethod);
-        return [
+
+        $body = [
             'mode' => $bodyType,
             $bodyType => $this->generateBodyContent($request, $bodyType, $requestConfig),
-            'options' => $this->getBodyOptions($bodyType)
         ];
+
+        $options = $this->getBodyOptions($bodyType);
+
+        if ($options !== null) {
+            $body['options'] = $options;
+        }
+
+        return $body;
     }
 
     protected function getRequestBodyType(string $defaultBodyType, string $httpMethod): string
@@ -277,12 +285,11 @@ class RequestBodyGenerator
         return $keys === range(0, count($array) - 1);
     }
 
-    protected function getBodyOptions(string $bodyType): array
+    protected function getBodyOptions(string $bodyType): ?array
     {
         return match ($bodyType) {
-            'json' => ['raw' => ['language' => 'json']],
-            'formdata' => [],
-            default => []
+            'raw' => ['raw' => ['language' => 'json']],
+            default => null,
         };
     }
 }
