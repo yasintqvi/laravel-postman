@@ -151,10 +151,31 @@ return [
     'output' => [
         'driver' => env('POSTMAN_STORAGE_DISK', 'local'),
 
-        // Storage path for generated files
         'path' => env('POSTMAN_STORAGE_DIR', storage_path('postman')),
 
-        // File naming pattern (date will be appended)
         'filename' => env('POSTMAN_STORAGE_FILE', 'api_collection'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Postman Cloud Sync
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the --push / --dry-run sync feature.
+    | Obtain your API key at: https://go.postman.co/settings/me/api-keys
+    | Obtain the Collection UID from: Collection → Info panel → Collection ID
+    |
+    */
+    'cloud' => [
+        'api_key'       => env('POSTMAN_API_KEY'),
+        'collection_id' => env('POSTMAN_COLLECTION_ID'),
+        'workspace_id'  => env('POSTMAN_WORKSPACE_ID'),
+
+        'merge' => [
+            'preserve_responses'     => true,
+            'preserve_scripts'       => true,
+            'preserve_manual_items'  => true,
+            'overwrite_descriptions' => false,
+        ],
     ],
 ];
