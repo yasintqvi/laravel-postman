@@ -214,6 +214,101 @@ Generated Postman collection will:
 }
 ```
 
+## Postman Cloud Sync
+
+### Prerequisites
+
+1. Generate a Postman API key at [go.postman.co/settings/me/api-keys](https://go.postman.co/settings/me/api-keys).
+2. Get the **Collection ID** with either method below.
+
+**Option A — Postman API (recommended)**
+
+List every collection on the account and copy `uid` (or `id`) for the collection you want to sync:
+
+```bash
+curl --location 'https://api.getpostman.com/collections' \
+  --header 'X-Api-Key: YOUR_POSTMAN_API_KEY'
+```
+
+Example response:
+
+```json
+{
+  "collections": [
+    {
+      "id": "12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "name": "My Phobia",
+      "uid": "12345678-12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    }
+  ]
+}
+```
+
+Use the `uid` value as `POSTMAN_COLLECTION_ID`. Match on `"name"` if you have more than one collection.
+
+To print name + uid only:
+
+```bash
+curl --location 'https://api.getpostman.com/collections' \
+  --header 'X-Api-Key: YOUR_POSTMAN_API_KEY' \
+  | php -r '$d=json_decode(stream_get_contents(STDIN), true); foreach (($d["collections"] ?? []) as $c) { echo $c["name"]." => ".$c["uid"].PHP_EOL; }'
+```
+
+**Option B — Postman app**
+
+Open the collection → ⋯ → **Info** → copy Collection ID.
+
+Add to your `.env`:
+
+```env
+POSTMAN_API_KEY=PMAK-xxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+POSTMAN_COLLECTION_ID=12345678-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+POSTMAN_WORKSPACE_ID=        # optional
+```
+
+Publish and update `config/postman.php`:
+
+```php
+'cloud' => [
+    'api_key'       => env('POSTMAN_API_KEY'),
+    'collection_id' => env('POSTMAN_COLLECTION_ID'),
+    'workspace_id'  => env('POSTMAN_WORKSPACE_ID'),
+
+    'merge' => [
+        'preserve_responses'     => true,  // keep saved example responses
+        'preserve_scripts'       => true,  // keep pre-request & test scripts
+        'preserve_manual_items'  => true,  // keep manually added routes/folders
+        'overwrite_descriptions' => false, // keep descriptions written in Postman UI
+    ],
+],
+```
+
+### Usage
+
+```bash
+# Generate locally only
+php artisan postman:generate
+
+# Generate + push incremental changes to Postman Cloud
+php artisan postman:generate --push
+
+# Preview the merge result without pushing (useful in CI)
+php artisan postman:generate --dry-run
+```
+
+### Merge Behaviour
+
+| Item | Behaviour |
+| :--- | :--- |
+| New Laravel routes | Added to the matching folder in the remote collection |
+| Changed route method / path | Updated automatically |
+| Updated FormRequest body fields | Updated automatically |
+| Saved example responses | **Preserved** (`preserve_responses`) |
+| Pre-request & test scripts | **Preserved** (`preserve_scripts`) |
+| Manually added Postman routes | **Preserved** (`preserve_manual_items`) |
+| Descriptions written in Postman | **Preserved** by default (`overwrite_descriptions: false`) |
+| Collection variables | Existing remote variables are never overwritten; new ones are appended |
+
 ## 🤝 Contributing
 Pull requests are welcome! For major changes, please open an issue first.
 

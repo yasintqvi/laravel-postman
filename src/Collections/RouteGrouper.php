@@ -44,40 +44,38 @@ class RouteGrouper
 
     protected function formatRoute(RouteInfoDto $route): array
     {
-        $variable = false;
+        preg_match_all('/\{([^}]+)\}/', $route->uri, $paramMatches);
+        $pathParams = $paramMatches[1];
+        $hasParams  = !empty($pathParams);
 
-        if (str_contains($route->uri, '{') | str_contains($route->uri, '}')) {
-            $variable = true;
-        }
+        $rawUri = preg_replace('/\{([^}]+)\}/', ':$1', $route->uri);
 
-        $newUri = str_replace(['{', '}'], [':', ''], $route->uri);
+        $pathSegments = array_values(array_filter(
+            explode('/', $rawUri),
+            fn(string $segment) => $segment !== ''
+        ));
 
         $formatted = [
-            'name' => $this->name_generator->generate($route),
+            'name'    => $this->name_generator->generate($route),
             'request' => [
                 'method' => $route->methods[0],
                 'header' => $this->buildHeaders($route),
-                'url' => [
-                    'raw' => '{{base_url}}/' . $newUri,
+                'url'    => [
+                    'raw'  => '{{base_url}}/' . $rawUri,
                     'host' => ['{{base_url}}'],
-                    'path' => explode('/', $newUri),
-                ]
-            ]
+                    'path' => $pathSegments,
+                ],
+            ],
         ];
 
-        if ($variable) {
-            $formatted['request']['url']['variable'] = [];
-            $matches = preg_match('/\{([^}]+)\}/', $route->uri);
-            preg_match_all('/\{([^}]+)\}/', $route->uri, $matches);
-
-            foreach ($matches[1] as $param) {
-                if (isset($this->requestConfig[$param])) {
-                    $formatted['request']['url']['variable'][] = [
-                        'key' => $param,
-                        'value' => $this->requestConfig[$param]
-                    ];
-                }
-            }
+        if ($hasParams) {
+            $formatted['request']['url']['variable'] = array_map(
+                fn(string $param) => [
+                    'key'   => $param,
+                    'value' => $this->requestConfig[$param] ?? '',
+                ],
+                $pathParams
+            );
         }
 
         if ($route->formRequest) {
@@ -112,8 +110,7 @@ class RouteGrouper
         foreach ($this->config['headers'] ?? [] as $key => $value) {
             $headers[] = [
                 'key' => $key,
-                'value' => $value,
-                'type' => 'text'
+                'value' => (string) $value,
             ];
         }
         return $headers;
@@ -135,7 +132,6 @@ class RouteGrouper
         return [
             'key' => $this->config['auth']['default']['key_name'] ?? 'X-API-KEY',
             'value' => '{{api_key}}',
-            'type' => 'text'
         ];
     }
 
