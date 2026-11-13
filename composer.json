@@ -12,6 +12,11 @@
             "YasinTgh\\LaravelPostman\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "YasinTgh\\LaravelPostman\\Tests\\": "tests/"
+        }
+    },
     "authors": [
         {
             "name": "yasin taghavi",
@@ -28,5 +33,12 @@
             "logo": "https://i.imgur.com/wt0yMs7.png"
         }
     },
-    "license": "MIT"
+    "license": "MIT",
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.5|^11.0"
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
 }
