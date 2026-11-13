@@ -107,19 +107,13 @@ class RouteGrouper
         return $formatted;
     }
 
+    /**
+     * The API key is not added here: the request's apikey auth already
+     * sends it, in the header or query string as configured.
+     */
     protected function buildHeaders(RouteInfoDto $route): array
     {
-        $headers = $this->buildDefaultHeaders();
-
-        if (
-            $this->isProtectedRoute($route)
-            && $this->isApiKeyAuth()
-            && ($this->config['auth']['location'] ?? 'header') === 'header'
-        ) {
-            $headers[] = $this->buildApiKeyHeader();
-        }
-
-        return $headers;
+        return $this->buildDefaultHeaders();
     }
 
     protected function buildDefaultHeaders(): array
@@ -144,19 +138,6 @@ class RouteGrouper
 
         $authMiddleware = $this->config['auth']['protected_middleware'] ?? ['auth'];
         return !empty(array_intersect($authMiddleware, $route->middleware));
-    }
-
-    protected function isApiKeyAuth(): bool
-    {
-        return ($this->config['auth']['type'] ?? null) === 'api_key';
-    }
-
-    protected function buildApiKeyHeader(): array
-    {
-        return [
-            'key' => $this->config['auth']['default']['key_name'] ?? 'X-API-KEY',
-            'value' => '{{api_key}}',
-        ];
     }
 
     protected function buildRouteAuth(): array
