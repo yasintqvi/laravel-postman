@@ -2,8 +2,12 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
+use BackedEnum;
 use Illuminate\Container\Container;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\In;
+use ReflectionProperty;
 use Throwable;
 
 class RequestBodyGenerator
@@ -67,11 +71,13 @@ class RequestBodyGenerator
 
     protected function setNestedValue(&$data, string $field, array|string|object $rules, array $requestConfig): void
     {
-        if (is_object($rules)) {
-            return;
-        }
-
-        $rules = is_array($rules) ? $rules : explode('|', $rules);
+        // A single rule object (new Enum(...), Rule::in(...), a closure) is
+        // still a field; treat it like a one-item rule list.
+        $rules = match (true) {
+            is_array($rules) => $rules,
+            is_string($rules) => explode('|', $rules),
+            default => [$rules],
+        };
         $value = $this->generateFieldValue($field, $rules, $requestConfig);
 
         // Handle array notation: field.*.subfield -> field[].subfield
@@ -107,6 +113,11 @@ class RequestBodyGenerator
 
         if (array_key_exists($field, $defaultValues)) {
             return $defaultValues[$field];
+        }
+
+        $allowed = $this->allowedValue($rules);
+        if ($allowed !== null) {
+            return $allowed;
         }
 
         if (in_array('email', $rules)) {
@@ -167,6 +178,39 @@ class RequestBodyGenerator
         }
 
         return 'sample_text';
+    }
+
+    /**
+     * First value accepted by an "in:" rule, Rule::in() or an Enum rule.
+     */
+    protected function allowedValue(array $rules): mixed
+    {
+        foreach ($rules as $rule) {
+            if (is_string($rule) && str_starts_with($rule, 'in:')) {
+                return trim(explode(',', substr($rule, 3))[0], '"\'');
+            }
+
+            if ($rule instanceof In || $rule instanceof Enum) {
+                $property = $rule instanceof In ? 'values' : 'type';
+
+                try {
+                    $value = (new ReflectionProperty($rule, $property))->getValue($rule);
+                } catch (Throwable) {
+                    continue;
+                }
+
+                if ($rule instanceof In && is_array($value) && $value !== []) {
+                    $first = reset($value);
+                    return $first instanceof BackedEnum ? $first->value : $first;
+                }
+
+                if (is_string($value) && enum_exists($value) && ($cases = $value::cases()) !== []) {
+                    return $cases[0] instanceof BackedEnum ? $cases[0]->value : $cases[0]->name;
+                }
+            }
+        }
+
+        return null;
     }
 
     protected function generateDateTimeValue(string $format): string
