@@ -6,8 +6,10 @@ class CollectionMerger
 {
     private array $mergeConfig;
 
-    /** @var array{added: string[], updated: string[], preserved: string[]} */
-    private array $report = ['added' => [], 'updated' => [], 'preserved' => []];
+    private string $routePrefix;
+
+    /** @var array{added: string[], updated: string[], preserved: string[], removed: string[]} */
+    private array $report = ['added' => [], 'updated' => [], 'preserved' => [], 'removed' => []];
 
     public function __construct(array $config)
     {
@@ -17,11 +19,13 @@ class CollectionMerger
             'preserve_manual_items'  => true,
             'overwrite_descriptions' => false,
         ];
+
+        $this->routePrefix = trim((string) ($config['routes']['prefix'] ?? ''), '/');
     }
 
     public function merge(array $remote, array $generated): array
     {
-        $this->report = ['added' => [], 'updated' => [], 'preserved' => []];
+        $this->report = ['added' => [], 'updated' => [], 'preserved' => [], 'removed' => []];
 
         $remoteIndex = [];
         $this->indexRequests($remote['item'] ?? [], $remoteIndex);
@@ -54,7 +58,8 @@ class CollectionMerger
     /**
      * What the last merge() did, as lists of "METHOD:path" keys:
      * added (new routes), updated (matched remote requests) and
-     * preserved (remote-only requests kept as manual items).
+     * preserved (remote-only requests kept as manual items) and
+     * removed (stale generated requests dropped by prune_stale_routes).
      */
     public function lastReport(): array
     {
@@ -222,13 +227,45 @@ class CollectionMerger
 
             $key = $this->routeKey($item);
 
-            if ($key === null || !isset($matchedKeys[$key])) {
-                $this->report['preserved'][] = $key ?? (string) ($item['name'] ?? '');
-                $mergedItems[] = $item;
+            if ($key !== null && isset($matchedKeys[$key])) {
+                continue;
             }
+
+            if ($key !== null && $this->isStaleGeneratedRequest($item, $key)) {
+                $this->report['removed'][] = $key;
+                continue;
+            }
+
+            $this->report['preserved'][] = $key ?? (string) ($item['name'] ?? '');
+            $mergedItems[] = $item;
         }
 
         return $mergedItems;
+    }
+
+    /**
+     * With prune_stale_routes on, a remote-only request that looks like
+     * one this package generated ({{base_url}} URL under the configured
+     * route prefix) is treated as a deleted route rather than a manual item.
+     */
+    private function isStaleGeneratedRequest(array $item, string $key): bool
+    {
+        if (!($this->mergeConfig['prune_stale_routes'] ?? false)) {
+            return false;
+        }
+
+        $url = $item['request']['url'] ?? '';
+        $raw = is_array($url) ? (string) ($url['raw'] ?? '') : (string) $url;
+
+        if (!str_starts_with($raw, '{{base_url}}')) {
+            return false;
+        }
+
+        $path = explode(':', $key, 2)[1] ?? '';
+
+        return $this->routePrefix === ''
+            || $path === $this->routePrefix
+            || str_starts_with($path, $this->routePrefix . '/');
     }
 
     private function mergeVariables(array $remote, array $generated): array
