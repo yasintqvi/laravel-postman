@@ -111,9 +111,11 @@ Document your API authentication:
         'key_value' => env('POSTMAN_API_KEY')
     ],
     
-    'protected_middleware' => ['auth:api', 'auth:sanctum']
+    'protected_middleware' => ['auth', 'auth:api', 'auth:sanctum']
 ]
 ```
+
+Routes with one of the `protected_middleware` get the configured auth. Every other route gets **No Auth**, so public endpoints don't inherit the collection's credentials. Make sure the list covers your guards (e.g. `auth:sanctum`). Auth you set on a request by hand in Postman is kept on `--push`.
 
 ### Output Configuration
 

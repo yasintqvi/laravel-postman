@@ -80,6 +80,29 @@ class CollectionBuildTest extends TestCase
         ], $this->tree($collection['item']));
     }
 
+    public function test_prefix_strategy_groups_by_first_static_segment(): void
+    {
+        Route::get('api/{locale}', [UserController::class, 'index']);
+        Route::get('api/{locale}/pages', [UserController::class, 'index']);
+        Route::get('api/v1/users', [UserController::class, 'index']);
+
+        $folders = fn(array $overrides) => array_column($this->build($overrides)['item'], 'name');
+        $prefixStrategy = ['structure' => ['folders' => ['strategy' => 'prefix']]];
+
+        $this->assertSame(['other', 'pages', 'v1'], $folders($prefixStrategy));
+        $this->assertSame(['users'], $folders($prefixStrategy + ['routes' => ['prefix' => 'api/v1']]));
+    }
+
+    public function test_controller_strategy_names_closure_folder_and_strips_suffix_only(): void
+    {
+        Route::get('api/users', [UserController::class, 'index']);
+        Route::get('api/ping', fn() => 'pong');
+
+        $folders = array_column($this->build(['structure' => ['folders' => ['strategy' => 'controller']]])['item'], 'name');
+
+        $this->assertSame(['User', 'Closures'], $folders);
+    }
+
     public function test_path_variables_drop_optional_and_binding_markers(): void
     {
         Route::get('api/posts/{post:slug}/{comment?}', [UserController::class, 'index']);
@@ -120,6 +143,17 @@ class CollectionBuildTest extends TestCase
 
         $this->assertArrayNotHasKey('auth', $this->findRequest($collection['item'], 'GET')['request']);
         $this->assertArrayNotHasKey('auth', $collection);
+    }
+
+    public function test_public_routes_opt_out_of_collection_auth(): void
+    {
+        Route::get('api/users', [UserController::class, 'index']);
+        Route::delete('api/users/{user}', [UserController::class, 'index'])->middleware('auth:sanctum');
+
+        $items = $this->build(['auth' => ['enabled' => true, 'type' => 'bearer']])['item'];
+
+        $this->assertSame(['type' => 'noauth'], $this->findRequest($items, 'GET')['request']['auth']);
+        $this->assertSame('bearer', $this->findRequest($items, 'DELETE')['request']['auth']['type']);
     }
 
     public function test_api_key_auth_uses_config_and_is_not_duplicated_as_header(): void

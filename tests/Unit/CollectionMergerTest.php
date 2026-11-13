@@ -68,6 +68,25 @@ class CollectionMergerTest extends TestCase
         $this->assertSame(['GET:health'], $merger->lastReport()['preserved']);
     }
 
+    public function test_manual_request_auth_is_kept_over_generated_noauth(): void
+    {
+        $manualAuth = ['type' => 'bearer', 'bearer' => [['key' => 'token', 'value' => '{{admin_token}}']]];
+
+        $remote = ['item' => [$this->request('GET', 'api/users')]];
+        $remote['item'][0]['request']['auth'] = $manualAuth;
+
+        $generated = ['item' => [$this->request('GET', 'api/users'), $this->request('GET', 'api/posts')]];
+        foreach ($generated['item'] as &$item) {
+            $item['request']['auth'] = ['type' => 'noauth'];
+        }
+        unset($item);
+
+        $merged = $this->merger()->merge($remote, $generated);
+
+        $this->assertSame($manualAuth, $merged['item'][0]['request']['auth']);
+        $this->assertSame(['type' => 'noauth'], $merged['item'][1]['request']['auth']);
+    }
+
     public function test_folder_ids_survive_merge_and_sanitizing(): void
     {
         $merged = $this->merger()->merge($this->remote(), $this->generated());

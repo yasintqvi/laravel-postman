@@ -31,12 +31,14 @@ class RouteGrouper
         $groups = [];
 
         foreach ($routes as $route) {
-            $prefix = explode('/', $route->uri)[1] ?? 'other';
+            // First static segment after the configured prefix, so "api/{locale}"
+            // doesn't create a "{locale}" folder and multi-segment prefixes work.
+            $prefix = $this->staticSegments($route->uri)[0] ?? 'other';
             $groups[$prefix][] = $this->formatRoute($route);
         }
 
         return array_map(
-            fn($items, $name) => ['name' => $name, 'item' => $items],
+            fn($items, $name) => ['name' => (string) $name, 'item' => $items],
             $groups,
             array_keys($groups)
         );
@@ -102,6 +104,10 @@ class RouteGrouper
 
         if ($this->isProtectedRoute($route)) {
             $formatted['request']['auth'] = $this->buildRouteAuth();
+        } elseif ($this->config['auth']['enabled'] ?? false) {
+            // Postman requests inherit the collection's auth unless they set
+            // their own, so public routes must opt out explicitly.
+            $formatted['request']['auth'] = ['type' => 'noauth'];
         }
 
         return $formatted;
@@ -257,11 +263,16 @@ class RouteGrouper
 
     protected function extractControllerName(?string $controllerClass): string
     {
+        // Closure routes have no controller class.
         if (!$controllerClass) {
-            return 'Undefined';
+            return 'Closures';
         }
 
         $baseName = class_basename($controllerClass);
-        return str_replace('Controller', '', $baseName);
+
+        // Strip only the "Controller" suffix: "ControllerLogController" -> "ControllerLog".
+        $name = preg_replace('/Controller$/', '', $baseName);
+
+        return $name !== '' ? $name : $baseName;
     }
 }
