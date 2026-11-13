@@ -93,6 +93,16 @@ class CollectionBuildTest extends TestCase
         $this->assertSame(['users'], $folders($prefixStrategy + ['routes' => ['prefix' => 'api/v1']]));
     }
 
+    public function test_controller_strategy_names_closure_folder_and_strips_suffix_only(): void
+    {
+        Route::get('api/users', [UserController::class, 'index']);
+        Route::get('api/ping', fn() => 'pong');
+
+        $folders = array_column($this->build(['structure' => ['folders' => ['strategy' => 'controller']]])['item'], 'name');
+
+        $this->assertSame(['User', 'Closures'], $folders);
+    }
+
     public function test_path_variables_drop_optional_and_binding_markers(): void
     {
         Route::get('api/posts/{post:slug}/{comment?}', [UserController::class, 'index']);

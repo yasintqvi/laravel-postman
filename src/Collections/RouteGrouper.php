@@ -259,11 +259,16 @@ class RouteGrouper
 
     protected function extractControllerName(?string $controllerClass): string
     {
+        // Closure routes have no controller class.
         if (!$controllerClass) {
-            return 'Undefined';
+            return 'Closures';
         }
 
         $baseName = class_basename($controllerClass);
-        return str_replace('Controller', '', $baseName);
+
+        // Strip only the "Controller" suffix: "ControllerLogController" -> "ControllerLog".
+        $name = preg_replace('/Controller$/', '', $baseName);
+
+        return $name !== '' ? $name : $baseName;
     }
 }
