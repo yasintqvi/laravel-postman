@@ -90,6 +90,16 @@ class RouteGrouper
             );
         }
 
+        // Content-Type only describes a raw body. Without a body it is noise,
+        // and for form-data Postman must set it itself (with the multipart
+        // boundary); a fixed "application/json" would break the request.
+        if (($formatted['request']['body']['mode'] ?? null) !== 'raw') {
+            $formatted['request']['header'] = array_values(array_filter(
+                $formatted['request']['header'],
+                fn(array $header) => strcasecmp($header['key'], 'Content-Type') !== 0
+            ));
+        }
+
         if ($this->isProtectedRoute($route)) {
             $formatted['request']['auth'] = $this->buildRouteAuth();
         }
