@@ -167,17 +167,42 @@ class RequestBodyGenerator
             }
         }
 
-        $minLength = 5;
+        return $this->sampleString($rules);
+    }
+
+    /**
+     * "sample_text", padded or cut to satisfy min:, max: and size: rules.
+     */
+    protected function sampleString(array $rules): string
+    {
+        $text = 'sample_text';
+        $min = null;
+        $max = null;
+
         foreach ($rules as $rule) {
-            if ($rule instanceof ValidationRule || $rule instanceof Rule) {
+            if (!is_string($rule)) {
                 continue;
             }
-            if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                $minLength = max($minLength, (int)str_replace('min:', '', $rule));
-            }
+
+            [$name, $param] = array_pad(explode(':', $rule, 2), 2, '');
+
+            match ($name) {
+                'min' => $min = (int) $param,
+                'max' => $max = (int) $param,
+                'size' => $min = $max = (int) $param,
+                default => null,
+            };
         }
 
-        return 'sample_text';
+        if ($min !== null && strlen($text) < $min) {
+            $text = str_pad($text, $min, '_x');
+        }
+
+        if ($max !== null && $max >= 0 && strlen($text) > $max) {
+            $text = substr($text, 0, $max);
+        }
+
+        return $text;
     }
 
     /**
