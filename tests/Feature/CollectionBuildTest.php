@@ -80,6 +80,19 @@ class CollectionBuildTest extends TestCase
         ], $this->tree($collection['item']));
     }
 
+    public function test_prefix_strategy_groups_by_first_static_segment(): void
+    {
+        Route::get('api/{locale}', [UserController::class, 'index']);
+        Route::get('api/{locale}/pages', [UserController::class, 'index']);
+        Route::get('api/v1/users', [UserController::class, 'index']);
+
+        $folders = fn(array $overrides) => array_column($this->build($overrides)['item'], 'name');
+        $prefixStrategy = ['structure' => ['folders' => ['strategy' => 'prefix']]];
+
+        $this->assertSame(['other', 'pages', 'v1'], $folders($prefixStrategy));
+        $this->assertSame(['users'], $folders($prefixStrategy + ['routes' => ['prefix' => 'api/v1']]));
+    }
+
     public function test_path_variables_drop_optional_and_binding_markers(): void
     {
         Route::get('api/posts/{post:slug}/{comment?}', [UserController::class, 'index']);

@@ -31,12 +31,14 @@ class RouteGrouper
         $groups = [];
 
         foreach ($routes as $route) {
-            $prefix = explode('/', $route->uri)[1] ?? 'other';
+            // First static segment after the configured prefix, so "api/{locale}"
+            // doesn't create a "{locale}" folder and multi-segment prefixes work.
+            $prefix = $this->staticSegments($route->uri)[0] ?? 'other';
             $groups[$prefix][] = $this->formatRoute($route);
         }
 
         return array_map(
-            fn($items, $name) => ['name' => $name, 'item' => $items],
+            fn($items, $name) => ['name' => (string) $name, 'item' => $items],
             $groups,
             array_keys($groups)
         );
