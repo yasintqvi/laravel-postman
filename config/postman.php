@@ -124,7 +124,7 @@ return [
         ],
 
         // Middleware that indicate protected routes
-        'protected_middleware' => ['auth:api'],
+        'protected_middleware' => ['auth', 'auth:api', 'auth:sanctum'],
     ],
 
     /*
@@ -176,6 +176,11 @@ return [
             'preserve_scripts'       => true,
             'preserve_manual_items'  => true,
             'overwrite_descriptions' => false,
+
+            // Remove remote requests whose route no longer exists. Only
+            // requests that look generated ({{base_url}} URL under
+            // routes.prefix) are removed; run --dry-run first to review them.
+            'prune_stale_routes'     => false,
         ],
     ],
 ];

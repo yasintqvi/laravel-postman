@@ -2,7 +2,12 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
+use BackedEnum;
+use Illuminate\Container\Container;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\In;
+use ReflectionProperty;
 use Throwable;
 
 class RequestBodyGenerator
@@ -33,14 +38,20 @@ class RequestBodyGenerator
     protected function generateBodyContent(FormRequest $request, string $bodyType, array $requestConfig): array|string|null
     {
         try {
-            $rules = $request->rules();
+            // Like Laravel itself, call rules() through the container so
+            // method-injected dependencies are resolved.
+            $rules = method_exists($request, 'rules')
+                ? Container::getInstance()->call([$request, 'rules'])
+                : [];
+            $rules = is_array($rules) ? $rules : [];
         } catch (Throwable $th) {
             $rules = [];
         }
 
         return match ($bodyType) {
+            // An empty body is a JSON object ({}), not a list ([]).
             'raw' => json_encode(
-                $this->generateFromRules($rules, $requestConfig),
+                $this->generateFromRules($rules, $requestConfig) ?: new \stdClass(),
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             ),
             'formdata' => $this->generateFormData($rules, $requestConfig),
@@ -61,11 +72,13 @@ class RequestBodyGenerator
 
     protected function setNestedValue(&$data, string $field, array|string|object $rules, array $requestConfig): void
     {
-        if (is_object($rules)) {
-            return;
-        }
-
-        $rules = is_array($rules) ? $rules : explode('|', $rules);
+        // A single rule object (new Enum(...), Rule::in(...), a closure) is
+        // still a field; treat it like a one-item rule list.
+        $rules = match (true) {
+            is_array($rules) => $rules,
+            is_string($rules) => explode('|', $rules),
+            default => [$rules],
+        };
         $value = $this->generateFieldValue($field, $rules, $requestConfig);
 
         // Handle array notation: field.*.subfield -> field[].subfield
@@ -103,6 +116,11 @@ class RequestBodyGenerator
             return $defaultValues[$field];
         }
 
+        $allowed = $this->allowedValue($rules);
+        if ($allowed !== null) {
+            return $allowed;
+        }
+
         if (in_array('email', $rules)) {
             return 'user' . rand(1, 100) . '@example.com';
         }
@@ -112,57 +130,126 @@ class RequestBodyGenerator
         }
 
         if (in_array('integer', $rules)) {
-            $min = 0;
-            $max = 10;
-            foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                    $min = (int)str_replace('min:', '', $rule);
-                }
-                if (is_string($rule) && str_starts_with($rule, 'max:')) {
-                    $max = (int)str_replace('max:', '', $rule);
-                }
-            }
-            return rand($min, $max);
+            return $this->numberInRange($rules, 0, 10);
         }
 
         if (in_array('numeric', $rules)) {
-            $min = 1;
-            $max = 100;
-            foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                    $min = (int)str_replace('min:', '', $rule);
-                }
-                if (is_string($rule) && str_starts_with($rule, 'max:')) {
-                    $max = (int)str_replace('max:', '', $rule);
-                }
-            }
-            return rand($min, $max);
+            return $this->numberInRange($rules, 1, 100);
         }
 
         if (in_array('boolean', $rules)) {
             return rand(0, 1);
         }
 
-        if (in_array('date_format', $rules)) {
-            foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'date_format:')) {
-                    $format = str_replace('date_format:', '', $rule);
-                    return $this->generateDateTimeValue($format);
+        // The rule is written "date_format:Y-m-d", never the bare word.
+        foreach ($rules as $rule) {
+            if (is_string($rule) && str_starts_with($rule, 'date_format:')) {
+                return $this->generateDateTimeValue(substr($rule, strlen('date_format:')));
+            }
+        }
+
+        return $this->sampleString($rules);
+    }
+
+    /**
+     * Random integer that satisfies min:, max:, between: and size:.
+     * The defaults only fill in a bound the rules don't set.
+     */
+    protected function numberInRange(array $rules, int $defaultMin, int $defaultMax): int
+    {
+        $min = null;
+        $max = null;
+
+        foreach ($rules as $rule) {
+            if (!is_string($rule)) {
+                continue;
+            }
+
+            [$name, $param] = array_pad(explode(':', $rule, 2), 2, '');
+            $values = array_map('floatval', explode(',', $param));
+
+            match ($name) {
+                'min' => $min = (int) ceil($values[0]),
+                'max' => $max = (int) floor($values[0]),
+                'size' => $min = $max = (int) $values[0],
+                'between' => [$min, $max] = [(int) ceil($values[0]), (int) floor($values[1] ?? $values[0])],
+                default => null,
+            };
+        }
+
+        // Keep the default span when only one bound is given.
+        $min ??= $max !== null ? min($defaultMin, $max) : $defaultMin;
+        $max ??= max($defaultMax, $min + ($defaultMax - $defaultMin));
+
+        return $min > $max ? $min : random_int($min, $max);
+    }
+
+    /**
+     * "sample_text", padded or cut to satisfy min:, max: and size: rules.
+     */
+    protected function sampleString(array $rules): string
+    {
+        $text = 'sample_text';
+        $min = null;
+        $max = null;
+
+        foreach ($rules as $rule) {
+            if (!is_string($rule)) {
+                continue;
+            }
+
+            [$name, $param] = array_pad(explode(':', $rule, 2), 2, '');
+
+            match ($name) {
+                'min' => $min = (int) $param,
+                'max' => $max = (int) $param,
+                'size' => $min = $max = (int) $param,
+                default => null,
+            };
+        }
+
+        if ($min !== null && strlen($text) < $min) {
+            $text = str_pad($text, $min, '_x');
+        }
+
+        if ($max !== null && $max >= 0 && strlen($text) > $max) {
+            $text = substr($text, 0, $max);
+        }
+
+        return $text;
+    }
+
+    /**
+     * First value accepted by an "in:" rule, Rule::in() or an Enum rule.
+     */
+    protected function allowedValue(array $rules): mixed
+    {
+        foreach ($rules as $rule) {
+            if (is_string($rule) && str_starts_with($rule, 'in:')) {
+                return trim(explode(',', substr($rule, 3))[0], '"\'');
+            }
+
+            if ($rule instanceof In || $rule instanceof Enum) {
+                $property = $rule instanceof In ? 'values' : 'type';
+
+                try {
+                    $value = (new ReflectionProperty($rule, $property))->getValue($rule);
+                } catch (Throwable) {
+                    continue;
+                }
+
+                if ($rule instanceof In && is_array($value) && $value !== []) {
+                    $first = reset($value);
+                    return $first instanceof BackedEnum ? $first->value : $first;
+                }
+
+                if (is_string($value) && enum_exists($value) && ($cases = $value::cases()) !== []) {
+                    return $cases[0] instanceof BackedEnum ? $cases[0]->value : $cases[0]->name;
                 }
             }
         }
 
-        $minLength = 5;
-        foreach ($rules as $rule) {
-            if ($rule instanceof ValidationRule || $rule instanceof Rule) {
-                continue;
-            }
-            if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                $minLength = max($minLength, (int)str_replace('min:', '', $rule));
-            }
-        }
-
-        return 'sample_text';
+        return null;
     }
 
     protected function generateDateTimeValue(string $format): string
@@ -192,19 +279,32 @@ class RequestBodyGenerator
                 // Last part - set the value
                 $cleanPart = ltrim($part, '.');
 
-                if (empty($current)) {
-                    $current[] = [];
+                if ($cleanPart === '') {
+                    // "tags.*" describes the list elements themselves; don't
+                    // overwrite an element that deeper rules already shaped.
+                    if (!isset($current[0]) || !is_array($current[0]) || $current[0] === []) {
+                        $current[0] = $value;
+                    }
+                    continue;
                 }
 
-                if ($cleanPart) {
-                    $this->setNestedValueInArray($current[0], $cleanPart, $value);
+                if (!isset($current[0]) || !is_array($current[0])) {
+                    $current[0] = [];
                 }
+
+                $this->setNestedValueInArray($current[0], $cleanPart, $value);
             } else {
                 // Middle parts - nested arrays
                 $cleanPart = ltrim($part, '.');
 
-                if (empty($current)) {
-                    $current[] = [];
+                if (!isset($current[0]) || !is_array($current[0])) {
+                    $current[0] = [];
+                }
+
+                if ($cleanPart === '') {
+                    // Consecutive wildcards ("matrix.*.*"): descend into the element.
+                    $current = &$current[0];
+                    continue;
                 }
 
                 if (!isset($current[0][$cleanPart])) {

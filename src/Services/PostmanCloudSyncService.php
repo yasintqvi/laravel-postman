@@ -49,6 +49,11 @@ class PostmanCloudSyncService implements CloudSyncServiceInterface
         return $this->merger->merge($remoteCollection, $generatedCollection);
     }
 
+    public function lastMergeReport(): array
+    {
+        return $this->merger->lastReport();
+    }
+
     public function pushCollection(array $collection): void
     {
         $this->assertCredentials();

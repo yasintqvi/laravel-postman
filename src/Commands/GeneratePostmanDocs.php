@@ -23,7 +23,20 @@ class GeneratePostmanDocs extends Command
     ): int {
         $this->info('Analysing routes…');
 
-        $routes     = $analyzer->analyze();
+        $routes = $analyzer->analyze();
+
+        $skipped = method_exists($analyzer, 'skipped') ? $analyzer->skipped() : [];
+        foreach ($skipped as $route) {
+            $this->warn(sprintf(
+                '  Skipped [%s] %s: %s',
+                implode('|', $route['methods']),
+                $route['uri'],
+                $route['reason']
+            ));
+        }
+
+        $this->info(sprintf('%d route(s) documented, %d skipped.', count($routes), count($skipped)));
+
         $collection = $formatter->format($routes);
         $savedPath  = $formatter->save($collection);
 
@@ -48,6 +61,8 @@ class GeneratePostmanDocs extends Command
             $this->info('Merging…');
             $merged = $syncService->merge($remote, $generated);
 
+            $this->printMergeReport($syncService->lastMergeReport(), (bool) $isDryRun);
+
             if ($isDryRun) {
                 $this->warn('[dry-run] Merge complete — no changes pushed to Postman Cloud.');
                 return self::SUCCESS;
@@ -61,6 +76,44 @@ class GeneratePostmanDocs extends Command
         } catch (Throwable $e) {
             $this->error($e->getMessage());
             return self::FAILURE;
+        }
+    }
+
+    /**
+     * Prints counts for every push; a dry run also lists the requests
+     * so the user can see what would change before pushing.
+     */
+    private function printMergeReport(array $report, bool $detailed): void
+    {
+        $sections = [
+            'added'     => 'New requests',
+            'updated'   => 'Updated requests (remote responses, scripts and ids kept)',
+            'preserved' => 'Remote-only requests kept',
+            'removed'   => 'Stale requests removed',
+        ];
+
+        foreach ($sections as $key => $label) {
+            $items = $report[$key] ?? [];
+
+            if ($key === 'removed' && $items === []) {
+                continue;
+            }
+
+            $this->line(sprintf('  %s: %d', $label, count($items)));
+
+            if (!$detailed) {
+                continue;
+            }
+
+            foreach (array_slice($items, 0, 50) as $item) {
+                // Keys are "METHOD:path"; only the first colon separates them.
+                $parts = explode(':', (string) $item, 2);
+                $this->line('    - ' . (count($parts) === 2 ? "{$parts[0]} /{$parts[1]}" : ($item ?: '(unnamed)')));
+            }
+
+            if (count($items) > 50) {
+                $this->line(sprintf('    … and %d more', count($items) - 50));
+            }
         }
     }
 }

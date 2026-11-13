@@ -44,9 +44,9 @@ class Builder
 
     protected function buildAuth(): array
     {
-        $authConfig = $this->config['auth']['type'];
+        $authConfig = $this->config['auth'] ?? [];
 
-        switch ($authConfig) {
+        switch ($authConfig['type'] ?? null) {
             case 'bearer':
                 return [
                     'type' => 'bearer',

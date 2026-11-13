@@ -111,9 +111,11 @@ Document your API authentication:
         'key_value' => env('POSTMAN_API_KEY')
     ],
     
-    'protected_middleware' => ['auth:api', 'auth:sanctum']
+    'protected_middleware' => ['auth', 'auth:api', 'auth:sanctum']
 ]
 ```
+
+Routes with one of the `protected_middleware` get the configured auth. Every other route gets **No Auth**, so public endpoints don't inherit the collection's credentials. Make sure the list covers your guards (e.g. `auth:sanctum`). Auth you set on a request by hand in Postman is kept on `--push`.
 
 ### Output Configuration
 
@@ -279,6 +281,7 @@ Publish and update `config/postman.php`:
         'preserve_scripts'       => true,  // keep pre-request & test scripts
         'preserve_manual_items'  => true,  // keep manually added routes/folders
         'overwrite_descriptions' => false, // keep descriptions written in Postman UI
+        'prune_stale_routes'     => false, // remove requests for routes that no longer exist
     ],
 ],
 ```
@@ -307,6 +310,7 @@ php artisan postman:generate --dry-run
 | Pre-request & test scripts | **Preserved** (`preserve_scripts`) |
 | Manually added Postman routes | **Preserved** (`preserve_manual_items`) |
 | Descriptions written in Postman | **Preserved** by default (`overwrite_descriptions: false`) |
+| Requests for deleted routes | **Kept** by default; **removed** with `prune_stale_routes: true` (only `{{base_url}}` requests under `routes.prefix`, so check `--dry-run` first) |
 | Collection variables | Existing remote variables are never overwritten; new ones are appended |
 
 ## 🤝 Contributing

@@ -6,6 +6,11 @@ class CollectionMerger
 {
     private array $mergeConfig;
 
+    private string $routePrefix;
+
+    /** @var array{added: string[], updated: string[], preserved: string[], removed: string[]} */
+    private array $report = ['added' => [], 'updated' => [], 'preserved' => [], 'removed' => []];
+
     public function __construct(array $config)
     {
         $this->mergeConfig = $config['cloud']['merge'] ?? [
@@ -14,10 +19,14 @@ class CollectionMerger
             'preserve_manual_items'  => true,
             'overwrite_descriptions' => false,
         ];
+
+        $this->routePrefix = trim((string) ($config['routes']['prefix'] ?? ''), '/');
     }
 
     public function merge(array $remote, array $generated): array
     {
+        $this->report = ['added' => [], 'updated' => [], 'preserved' => [], 'removed' => []];
+
         $remoteIndex = [];
         $this->indexRequests($remote['item'] ?? [], $remoteIndex);
 
@@ -44,6 +53,17 @@ class CollectionMerger
         );
 
         return $remote;
+    }
+
+    /**
+     * What the last merge() did, as lists of "METHOD:path" keys:
+     * added (new routes), updated (matched remote requests) and
+     * preserved (remote-only requests kept as manual items) and
+     * removed (stale generated requests dropped by prune_stale_routes).
+     */
+    public function lastReport(): array
+    {
+        return $this->report;
     }
 
     private function indexRequests(array $items, array &$index): void
@@ -84,8 +104,10 @@ class CollectionMerger
 
             if ($key !== null && isset($remoteIndex[$key])) {
                 $matchedKeys[$key] = true;
+                $this->report['updated'][] = $key;
                 $result[] = $this->mergeRequest($genItem, $remoteIndex[$key]);
             } else {
+                $this->report['added'][] = $key ?? (string) ($genItem['name'] ?? '');
                 $result[] = $genItem;
             }
         }
@@ -109,6 +131,11 @@ class CollectionMerger
 
         if ($remoteFolder === null) {
             return $merged;
+        }
+
+        // Keep the folder's identity so Postman updates it in place.
+        if (isset($remoteFolder['id'])) {
+            $merged['id'] = $remoteFolder['id'];
         }
 
         if (($this->mergeConfig['preserve_scripts'] ?? true) && isset($remoteFolder['event'])) {
@@ -158,7 +185,10 @@ class CollectionMerger
             $merged['request']['description'] = $remote['request']['description'];
         }
 
-        if (!isset($generated['request']['auth']) && isset($remote['request']['auth'])) {
+        // Generated "noauth" only means "public route"; auth configured on the
+        // request in Postman is a deliberate choice, so keep it.
+        $generatedAuthType = $generated['request']['auth']['type'] ?? null;
+        if (($generatedAuthType === null || $generatedAuthType === 'noauth') && isset($remote['request']['auth'])) {
             $merged['request']['auth'] = $remote['request']['auth'];
         }
 
@@ -205,12 +235,45 @@ class CollectionMerger
 
             $key = $this->routeKey($item);
 
-            if ($key === null || !isset($matchedKeys[$key])) {
-                $mergedItems[] = $item;
+            if ($key !== null && isset($matchedKeys[$key])) {
+                continue;
             }
+
+            if ($key !== null && $this->isStaleGeneratedRequest($item, $key)) {
+                $this->report['removed'][] = $key;
+                continue;
+            }
+
+            $this->report['preserved'][] = $key ?? (string) ($item['name'] ?? '');
+            $mergedItems[] = $item;
         }
 
         return $mergedItems;
+    }
+
+    /**
+     * With prune_stale_routes on, a remote-only request that looks like
+     * one this package generated ({{base_url}} URL under the configured
+     * route prefix) is treated as a deleted route rather than a manual item.
+     */
+    private function isStaleGeneratedRequest(array $item, string $key): bool
+    {
+        if (!($this->mergeConfig['prune_stale_routes'] ?? false)) {
+            return false;
+        }
+
+        $url = $item['request']['url'] ?? '';
+        $raw = is_array($url) ? (string) ($url['raw'] ?? '') : (string) $url;
+
+        if (!str_starts_with($raw, '{{base_url}}')) {
+            return false;
+        }
+
+        $path = explode(':', $key, 2)[1] ?? '';
+
+        return $this->routePrefix === ''
+            || $path === $this->routePrefix
+            || str_starts_with($path, $this->routePrefix . '/');
     }
 
     private function mergeVariables(array $remote, array $generated): array

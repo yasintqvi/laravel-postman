@@ -31,12 +31,14 @@ class RouteGrouper
         $groups = [];
 
         foreach ($routes as $route) {
-            $prefix = explode('/', $route->uri)[1] ?? 'other';
+            // First static segment after the configured prefix, so "api/{locale}"
+            // doesn't create a "{locale}" folder and multi-segment prefixes work.
+            $prefix = $this->staticSegments($route->uri)[0] ?? 'other';
             $groups[$prefix][] = $this->formatRoute($route);
         }
 
         return array_map(
-            fn($items, $name) => ['name' => $name, 'item' => $items],
+            fn($items, $name) => ['name' => (string) $name, 'item' => $items],
             $groups,
             array_keys($groups)
         );
@@ -44,11 +46,15 @@ class RouteGrouper
 
     protected function formatRoute(RouteInfoDto $route): array
     {
-        preg_match_all('/\{([^}]+)\}/', $route->uri, $paramMatches);
-        $pathParams = $paramMatches[1];
+        // Laravel params may be optional ({id?}) or bind a field ({post:slug});
+        // Postman path variables only take the bare name (:id, :post).
+        $paramPattern = '/\{([^}:?]+)(?::[^}?]+)?\??\}/';
+
+        preg_match_all($paramPattern, $route->uri, $paramMatches);
+        $pathParams = array_values(array_unique($paramMatches[1]));
         $hasParams  = !empty($pathParams);
 
-        $rawUri = preg_replace('/\{([^}]+)\}/', ':$1', $route->uri);
+        $rawUri = preg_replace($paramPattern, ':$1', $route->uri);
 
         $pathSegments = array_values(array_filter(
             explode('/', $rawUri),
@@ -86,22 +92,34 @@ class RouteGrouper
             );
         }
 
+        // Content-Type only describes a raw body. Without a body it is noise,
+        // and for form-data Postman must set it itself (with the multipart
+        // boundary); a fixed "application/json" would break the request.
+        if (($formatted['request']['body']['mode'] ?? null) !== 'raw') {
+            $formatted['request']['header'] = array_values(array_filter(
+                $formatted['request']['header'],
+                fn(array $header) => strcasecmp($header['key'], 'Content-Type') !== 0
+            ));
+        }
+
         if ($this->isProtectedRoute($route)) {
             $formatted['request']['auth'] = $this->buildRouteAuth();
+        } elseif ($this->config['auth']['enabled'] ?? false) {
+            // Postman requests inherit the collection's auth unless they set
+            // their own, so public routes must opt out explicitly.
+            $formatted['request']['auth'] = ['type' => 'noauth'];
         }
 
         return $formatted;
     }
 
+    /**
+     * The API key is not added here: the request's apikey auth already
+     * sends it, in the header or query string as configured.
+     */
     protected function buildHeaders(RouteInfoDto $route): array
     {
-        $headers = $this->buildDefaultHeaders();
-
-        if ($this->isProtectedRoute($route) && $this->isApiKeyAuth()) {
-            $headers[] = $this->buildApiKeyHeader();
-        }
-
-        return $headers;
+        return $this->buildDefaultHeaders();
     }
 
     protected function buildDefaultHeaders(): array
@@ -118,21 +136,14 @@ class RouteGrouper
 
     protected function isProtectedRoute(RouteInfoDto $route): bool
     {
+        // Without auth enabled the collection defines no auth variables,
+        // so request-level auth would reference undefined {{...}} values.
+        if (!($this->config['auth']['enabled'] ?? false)) {
+            return false;
+        }
+
         $authMiddleware = $this->config['auth']['protected_middleware'] ?? ['auth'];
         return !empty(array_intersect($authMiddleware, $route->middleware));
-    }
-
-    protected function isApiKeyAuth(): bool
-    {
-        return ($this->config['auth']['type'] ?? null) === 'api_key';
-    }
-
-    protected function buildApiKeyHeader(): array
-    {
-        return [
-            'key' => $this->config['auth']['default']['key_name'] ?? 'X-API-KEY',
-            'value' => '{{api_key}}',
-        ];
     }
 
     protected function buildRouteAuth(): array
@@ -174,52 +185,62 @@ class RouteGrouper
 
     protected function groupByNestedPath(array $routes): array
     {
-        $maxDepth = $this->config['structure']['folders']['max_depth'] ?? 2;
+        $maxDepth = max(0, (int) ($this->config['structure']['folders']['max_depth'] ?? 2));
         $result = [];
 
         foreach ($routes as $route) {
-            $uriWithoutPrefix = trim(str_replace($this->config['routes']['prefix'], '', $route->uri), "/");
-
-            $uriWithoutSegments = preg_replace('/\{.*?\}/', '', $uriWithoutPrefix);
-
-            $uriWithoutSegments = trim(preg_replace('/\/+/', '/', $uriWithoutSegments), "/");
-
-            if (empty($uriWithoutSegments)) {
-                $segments = [];
-            } else {
-                $segments = explode('/', $uriWithoutSegments);
-            }
+            $folders = array_slice($this->staticSegments($route->uri), 0, $maxDepth);
 
             $current = &$result;
 
-            foreach ($segments as $i => $segment) {
-                if ($i < $maxDepth) {
-                    $found = false;
-                    foreach ($current as &$item) {
-                        if (isset($item['name']) && $item['name'] === $segment) {
-                            $current = &$item['item'];
-                            $found = true;
-                            break;
-                        }
-                    }
+            foreach ($folders as $segment) {
+                $index = $this->findFolderIndex($current, $segment);
 
-                    if (!$found) {
-                        $newItem = [
-                            'name' => $segment,
-                            'item' => []
-                        ];
-                        $current[] = $newItem;
-                        $current = &$current[count($current) - 1]['item'];
-                    }
-
-                    if ($i === count($segments) - 1) {
-                        $current[] = $this->formatRoute($route);
-                    }
+                if ($index === null) {
+                    $current[] = ['name' => $segment, 'item' => []];
+                    $index = array_key_last($current);
                 }
+
+                $current = &$current[$index]['item'];
             }
+
+            // Routes deeper than max_depth land in the deepest allowed folder;
+            // routes with no static segment (e.g. "api" or "api/{locale}") land at the root.
+            $current[] = $this->formatRoute($route);
+
+            unset($current);
         }
 
         return $result;
+    }
+
+    /**
+     * URI segments after the configured prefix, without route parameters.
+     */
+    protected function staticSegments(string $uri): array
+    {
+        $uri = trim($uri, '/');
+        $prefix = trim((string) ($this->config['routes']['prefix'] ?? ''), '/');
+
+        if ($prefix !== '' && ($uri === $prefix || str_starts_with($uri, $prefix . '/'))) {
+            $uri = substr($uri, strlen($prefix));
+        }
+
+        return array_values(array_filter(
+            explode('/', $uri),
+            fn(string $segment) => $segment !== '' && !preg_match('/^\{.*\}$/', $segment)
+        ));
+    }
+
+    protected function findFolderIndex(array $items, string $name): int|string|null
+    {
+        foreach ($items as $index => $item) {
+            if (isset($item['item']) && !isset($item['request']) && ($item['name'] ?? null) === $name) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     protected function groupByController(array $routes): array
@@ -242,11 +263,16 @@ class RouteGrouper
 
     protected function extractControllerName(?string $controllerClass): string
     {
+        // Closure routes have no controller class.
         if (!$controllerClass) {
-            return 'Undefined';
+            return 'Closures';
         }
 
         $baseName = class_basename($controllerClass);
-        return str_replace('Controller', '', $baseName);
+
+        // Strip only the "Controller" suffix: "ControllerLogController" -> "ControllerLog".
+        $name = preg_replace('/Controller$/', '', $baseName);
+
+        return $name !== '' ? $name : $baseName;
     }
 }
