@@ -44,11 +44,15 @@ class RouteGrouper
 
     protected function formatRoute(RouteInfoDto $route): array
     {
-        preg_match_all('/\{([^}]+)\}/', $route->uri, $paramMatches);
-        $pathParams = $paramMatches[1];
+        // Laravel params may be optional ({id?}) or bind a field ({post:slug});
+        // Postman path variables only take the bare name (:id, :post).
+        $paramPattern = '/\{([^}:?]+)(?::[^}?]+)?\??\}/';
+
+        preg_match_all($paramPattern, $route->uri, $paramMatches);
+        $pathParams = array_values(array_unique($paramMatches[1]));
         $hasParams  = !empty($pathParams);
 
-        $rawUri = preg_replace('/\{([^}]+)\}/', ':$1', $route->uri);
+        $rawUri = preg_replace($paramPattern, ':$1', $route->uri);
 
         $pathSegments = array_values(array_filter(
             explode('/', $rawUri),
@@ -84,6 +88,16 @@ class RouteGrouper
                 $this->config,
                 $route->methods[0],
             );
+        }
+
+        // Content-Type only describes a raw body. Without a body it is noise,
+        // and for form-data Postman must set it itself (with the multipart
+        // boundary); a fixed "application/json" would break the request.
+        if (($formatted['request']['body']['mode'] ?? null) !== 'raw') {
+            $formatted['request']['header'] = array_values(array_filter(
+                $formatted['request']['header'],
+                fn(array $header) => strcasecmp($header['key'], 'Content-Type') !== 0
+            ));
         }
 
         if ($this->isProtectedRoute($route)) {
