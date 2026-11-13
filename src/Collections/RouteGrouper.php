@@ -44,11 +44,15 @@ class RouteGrouper
 
     protected function formatRoute(RouteInfoDto $route): array
     {
-        preg_match_all('/\{([^}]+)\}/', $route->uri, $paramMatches);
-        $pathParams = $paramMatches[1];
+        // Laravel params may be optional ({id?}) or bind a field ({post:slug});
+        // Postman path variables only take the bare name (:id, :post).
+        $paramPattern = '/\{([^}:?]+)(?::[^}?]+)?\??\}/';
+
+        preg_match_all($paramPattern, $route->uri, $paramMatches);
+        $pathParams = array_values(array_unique($paramMatches[1]));
         $hasParams  = !empty($pathParams);
 
-        $rawUri = preg_replace('/\{([^}]+)\}/', ':$1', $route->uri);
+        $rawUri = preg_replace($paramPattern, ':$1', $route->uri);
 
         $pathSegments = array_values(array_filter(
             explode('/', $rawUri),
