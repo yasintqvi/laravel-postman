@@ -149,12 +149,10 @@ class RequestBodyGenerator
             return rand(0, 1);
         }
 
-        if (in_array('date_format', $rules)) {
-            foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'date_format:')) {
-                    $format = str_replace('date_format:', '', $rule);
-                    return $this->generateDateTimeValue($format);
-                }
+        // The rule is written "date_format:Y-m-d", never the bare word.
+        foreach ($rules as $rule) {
+            if (is_string($rule) && str_starts_with($rule, 'date_format:')) {
+                return $this->generateDateTimeValue(substr($rule, strlen('date_format:')));
             }
         }
 
