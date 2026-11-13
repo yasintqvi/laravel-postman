@@ -196,19 +196,32 @@ class RequestBodyGenerator
                 // Last part - set the value
                 $cleanPart = ltrim($part, '.');
 
-                if (empty($current)) {
-                    $current[] = [];
+                if ($cleanPart === '') {
+                    // "tags.*" describes the list elements themselves; don't
+                    // overwrite an element that deeper rules already shaped.
+                    if (!isset($current[0]) || !is_array($current[0]) || $current[0] === []) {
+                        $current[0] = $value;
+                    }
+                    continue;
                 }
 
-                if ($cleanPart) {
-                    $this->setNestedValueInArray($current[0], $cleanPart, $value);
+                if (!isset($current[0]) || !is_array($current[0])) {
+                    $current[0] = [];
                 }
+
+                $this->setNestedValueInArray($current[0], $cleanPart, $value);
             } else {
                 // Middle parts - nested arrays
                 $cleanPart = ltrim($part, '.');
 
-                if (empty($current)) {
-                    $current[] = [];
+                if (!isset($current[0]) || !is_array($current[0])) {
+                    $current[0] = [];
+                }
+
+                if ($cleanPart === '') {
+                    // Consecutive wildcards ("matrix.*.*"): descend into the element.
+                    $current = &$current[0];
+                    continue;
                 }
 
                 if (!isset($current[0][$cleanPart])) {
