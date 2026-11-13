@@ -65,12 +65,10 @@ class RouteAnalyzer implements RouteAnalyzerInterface
 
     protected function getFilteredRoutes(): array
     {
-        return array_filter($this->router->getRoutes()->getRoutes(), function (Route $route) {
-            if ($this->shouldIncludeRoute($route)) {
-                return str_starts_with($route->uri(), $this->config['routes']['prefix']);
-            }
-            return false;
-        });
+        return array_filter(
+            $this->router->getRoutes()->getRoutes(),
+            fn(Route $route) => $this->shouldIncludeRoute($route)
+        );
     }
 
     protected function parseRoute(Route $route): RouteInfoDto
@@ -138,15 +136,18 @@ class RouteAnalyzer implements RouteAnalyzerInterface
 
     protected function shouldIncludeRoute(Route $route): bool
     {
-        $prefix = $this->config['routes']['prefix'] ?? 'api';
-        if ($prefix && !str_starts_with($route->uri(), $prefix)) {
+        // Match whole segments: prefix "api" covers "api" and "api/users",
+        // not "apiary" or "api-docs".
+        $prefix = trim((string) ($this->config['routes']['prefix'] ?? 'api'), '/');
+        $uri = trim($route->uri(), '/');
+        if ($prefix !== '' && $uri !== $prefix && !str_starts_with($uri, $prefix . '/')) {
             return false;
         }
 
         if (!empty($this->config['routes']['include']['patterns'])) {
             $matched = false;
             foreach ($this->config['routes']['include']['patterns'] as $pattern) {
-                if (Str::is($pattern, $route->uri())) {
+                if (Str::is(trim($pattern, '/'), $route->uri())) {
                     $matched = true;
                     break;
                 }

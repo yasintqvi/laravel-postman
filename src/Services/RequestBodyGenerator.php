@@ -49,8 +49,9 @@ class RequestBodyGenerator
         }
 
         return match ($bodyType) {
+            // An empty body is a JSON object ({}), not a list ([]).
             'raw' => json_encode(
-                $this->generateFromRules($rules, $requestConfig),
+                $this->generateFromRules($rules, $requestConfig) ?: new \stdClass(),
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             ),
             'formdata' => $this->generateFormData($rules, $requestConfig),
@@ -129,31 +130,11 @@ class RequestBodyGenerator
         }
 
         if (in_array('integer', $rules)) {
-            $min = 0;
-            $max = 10;
-            foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                    $min = (int)str_replace('min:', '', $rule);
-                }
-                if (is_string($rule) && str_starts_with($rule, 'max:')) {
-                    $max = (int)str_replace('max:', '', $rule);
-                }
-            }
-            return rand($min, $max);
+            return $this->numberInRange($rules, 0, 10);
         }
 
         if (in_array('numeric', $rules)) {
-            $min = 1;
-            $max = 100;
-            foreach ($rules as $rule) {
-                if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                    $min = (int)str_replace('min:', '', $rule);
-                }
-                if (is_string($rule) && str_starts_with($rule, 'max:')) {
-                    $max = (int)str_replace('max:', '', $rule);
-                }
-            }
-            return rand($min, $max);
+            return $this->numberInRange($rules, 1, 100);
         }
 
         if (in_array('boolean', $rules)) {
@@ -167,17 +148,75 @@ class RequestBodyGenerator
             }
         }
 
-        $minLength = 5;
+        return $this->sampleString($rules);
+    }
+
+    /**
+     * Random integer that satisfies min:, max:, between: and size:.
+     * The defaults only fill in a bound the rules don't set.
+     */
+    protected function numberInRange(array $rules, int $defaultMin, int $defaultMax): int
+    {
+        $min = null;
+        $max = null;
+
         foreach ($rules as $rule) {
-            if ($rule instanceof ValidationRule || $rule instanceof Rule) {
+            if (!is_string($rule)) {
                 continue;
             }
-            if (is_string($rule) && str_starts_with($rule, 'min:')) {
-                $minLength = max($minLength, (int)str_replace('min:', '', $rule));
-            }
+
+            [$name, $param] = array_pad(explode(':', $rule, 2), 2, '');
+            $values = array_map('floatval', explode(',', $param));
+
+            match ($name) {
+                'min' => $min = (int) ceil($values[0]),
+                'max' => $max = (int) floor($values[0]),
+                'size' => $min = $max = (int) $values[0],
+                'between' => [$min, $max] = [(int) ceil($values[0]), (int) floor($values[1] ?? $values[0])],
+                default => null,
+            };
         }
 
-        return 'sample_text';
+        // Keep the default span when only one bound is given.
+        $min ??= $max !== null ? min($defaultMin, $max) : $defaultMin;
+        $max ??= max($defaultMax, $min + ($defaultMax - $defaultMin));
+
+        return $min > $max ? $min : random_int($min, $max);
+    }
+
+    /**
+     * "sample_text", padded or cut to satisfy min:, max: and size: rules.
+     */
+    protected function sampleString(array $rules): string
+    {
+        $text = 'sample_text';
+        $min = null;
+        $max = null;
+
+        foreach ($rules as $rule) {
+            if (!is_string($rule)) {
+                continue;
+            }
+
+            [$name, $param] = array_pad(explode(':', $rule, 2), 2, '');
+
+            match ($name) {
+                'min' => $min = (int) $param,
+                'max' => $max = (int) $param,
+                'size' => $min = $max = (int) $param,
+                default => null,
+            };
+        }
+
+        if ($min !== null && strlen($text) < $min) {
+            $text = str_pad($text, $min, '_x');
+        }
+
+        if ($max !== null && $max >= 0 && strlen($text) > $max) {
+            $text = substr($text, 0, $max);
+        }
+
+        return $text;
     }
 
     /**

@@ -4,13 +4,17 @@
     "type": "library",
     "require": {
         "php": "^8.1",
-        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
-        "symfony/console": "^6.0|^7.0|^8.0"
+        "laravel/framework": "^10.0|^11.0|^12.0|^13.0",
+        "guzzlehttp/guzzle": "^7.2"
     },
     "autoload": {
         "psr-4": {
             "YasinTgh\\LaravelPostman\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "YasinTgh\\LaravelPostman\\Tests\\": "tests/"
         }
     },
     "authors": [
@@ -29,5 +33,12 @@
             "logo": "https://i.imgur.com/wt0yMs7.png"
         }
     },
-    "license": "MIT"
+    "license": "MIT",
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.5|^11.0"
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
 }
