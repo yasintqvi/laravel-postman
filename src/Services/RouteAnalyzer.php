@@ -23,17 +23,44 @@ use YasinTgh\LaravelPostman\Exceptions\UnsupportedRouteException;
 
 class RouteAnalyzer implements RouteAnalyzerInterface
 {
+    /** @var array<int, array{uri: string, methods: array, reason: string}> */
+    protected array $skipped = [];
+
     public function __construct(
         protected Router $router,
         protected array $config
     ) {}
 
+    /**
+     * Routes that can't be processed are skipped (see skipped()) so one
+     * broken route doesn't abort the whole collection.
+     */
     public function analyze(): array
     {
-        return array_map(
-            [$this, 'parseRoute'],
-            $this->getFilteredRoutes()
-        );
+        $this->skipped = [];
+        $routes = [];
+
+        foreach ($this->getFilteredRoutes() as $route) {
+            try {
+                $routes[] = $this->parseRoute($route);
+            } catch (UnsupportedRouteException | RouteProcessingException $e) {
+                $this->skipped[] = [
+                    'uri' => $route->uri(),
+                    'methods' => $route->methods(),
+                    'reason' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $routes;
+    }
+
+    /**
+     * Routes skipped by the last analyze() call, with the reason.
+     */
+    public function skipped(): array
+    {
+        return $this->skipped;
     }
 
     protected function getFilteredRoutes(): array

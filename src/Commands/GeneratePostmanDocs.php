@@ -23,7 +23,20 @@ class GeneratePostmanDocs extends Command
     ): int {
         $this->info('Analysing routes…');
 
-        $routes     = $analyzer->analyze();
+        $routes = $analyzer->analyze();
+
+        $skipped = method_exists($analyzer, 'skipped') ? $analyzer->skipped() : [];
+        foreach ($skipped as $route) {
+            $this->warn(sprintf(
+                '  Skipped [%s] %s: %s',
+                implode('|', $route['methods']),
+                $route['uri'],
+                $route['reason']
+            ));
+        }
+
+        $this->info(sprintf('%d route(s) documented, %d skipped.', count($routes), count($skipped)));
+
         $collection = $formatter->format($routes);
         $savedPath  = $formatter->save($collection);
 
