@@ -6,6 +6,9 @@ class CollectionMerger
 {
     private array $mergeConfig;
 
+    /** @var array{added: string[], updated: string[], preserved: string[]} */
+    private array $report = ['added' => [], 'updated' => [], 'preserved' => []];
+
     public function __construct(array $config)
     {
         $this->mergeConfig = $config['cloud']['merge'] ?? [
@@ -18,6 +21,8 @@ class CollectionMerger
 
     public function merge(array $remote, array $generated): array
     {
+        $this->report = ['added' => [], 'updated' => [], 'preserved' => []];
+
         $remoteIndex = [];
         $this->indexRequests($remote['item'] ?? [], $remoteIndex);
 
@@ -44,6 +49,16 @@ class CollectionMerger
         );
 
         return $remote;
+    }
+
+    /**
+     * What the last merge() did, as lists of "METHOD:path" keys:
+     * added (new routes), updated (matched remote requests) and
+     * preserved (remote-only requests kept as manual items).
+     */
+    public function lastReport(): array
+    {
+        return $this->report;
     }
 
     private function indexRequests(array $items, array &$index): void
@@ -84,8 +99,10 @@ class CollectionMerger
 
             if ($key !== null && isset($remoteIndex[$key])) {
                 $matchedKeys[$key] = true;
+                $this->report['updated'][] = $key;
                 $result[] = $this->mergeRequest($genItem, $remoteIndex[$key]);
             } else {
+                $this->report['added'][] = $key ?? (string) ($genItem['name'] ?? '');
                 $result[] = $genItem;
             }
         }
@@ -206,6 +223,7 @@ class CollectionMerger
             $key = $this->routeKey($item);
 
             if ($key === null || !isset($matchedKeys[$key])) {
+                $this->report['preserved'][] = $key ?? (string) ($item['name'] ?? '');
                 $mergedItems[] = $item;
             }
         }
