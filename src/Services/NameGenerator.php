@@ -21,9 +21,12 @@ class NameGenerator
             $template = $default;
         }
 
+        // Laravel reports an invokable controller's action as its class name.
+        $action = $route->action === $route->controller ? '__invoke' : $route->action;
+
         return str_replace(
             ['{method}', '{uri}', '{controller}', '{action}'],
-            [$route->methods[0], $route->uri, $route->controller, $route->action],
+            [$route->methods[0], $route->uri, $route->controller, $action],
             $template
         );
     }

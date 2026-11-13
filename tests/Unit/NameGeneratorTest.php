@@ -20,6 +20,14 @@ class NameGeneratorTest extends TestCase
         $this->assertSame('POST App\\Http\\Controllers\\UserController@store', $this->routeName('{method} {controller}@{action}', $route));
     }
 
+    public function test_invokable_controllers_use_invoke_as_action(): void
+    {
+        $class = 'App\\Http\\Controllers\\HealthController';
+        $route = new RouteInfoDto('api', ['GET'], false, $class, $class);
+
+        $this->assertSame("{$class}@__invoke", $this->routeName('{controller}@{action}', $route));
+    }
+
     public function test_closures_fall_back_to_method_and_uri_when_format_needs_a_controller(): void
     {
         $closure = new RouteInfoDto('api/ping', ['GET', 'HEAD'], false, null, 'Closure');
