@@ -63,11 +63,6 @@ return [
             // Grouping strategy: 'prefix', 'nested_path', 'controller'
             'strategy' => 'nested_path',
             'max_depth' => 10, //  when strategy is nested_path
-
-            // Custom name mapping for folders
-            'mapping' => [
-                // Example: 'admin' => 'Administration'
-            ],
         ],
 
         /**
