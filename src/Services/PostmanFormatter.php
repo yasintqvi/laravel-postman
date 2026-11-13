@@ -23,7 +23,12 @@ class PostmanFormatter
     {
         $driver = data_get($this->config, 'output.driver');
         $path = data_get($this->config, 'output.path');
-        $filename = data_get($this->config, 'output.filename');
+        $filename = (string) data_get($this->config, 'output.filename', 'api_collection');
+
+        // Postman's import dialog filters on .json; add it unless the user chose an extension.
+        if (pathinfo($filename, PATHINFO_EXTENSION) === '') {
+            $filename .= '.json';
+        }
 
         $disk = Storage::build([
             'driver' => $driver,
