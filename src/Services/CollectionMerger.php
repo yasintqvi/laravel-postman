@@ -133,6 +133,11 @@ class CollectionMerger
             return $merged;
         }
 
+        // Keep the folder's identity so Postman updates it in place.
+        if (isset($remoteFolder['id'])) {
+            $merged['id'] = $remoteFolder['id'];
+        }
+
         if (($this->mergeConfig['preserve_scripts'] ?? true) && isset($remoteFolder['event'])) {
             $merged['event'] = $remoteFolder['event'];
         }

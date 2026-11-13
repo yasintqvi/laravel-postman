@@ -74,6 +74,7 @@ class CollectionSanitizer
         $children = $this->sanitizeItems($item['item'] ?? []);
 
         $folder = $this->only($item, [
+            'id',
             'name',
             'description',
             'variable',
