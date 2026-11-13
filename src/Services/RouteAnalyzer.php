@@ -3,16 +3,19 @@
 namespace YasinTgh\LaravelPostman\Services;
 
 use Closure;
-use Exception;
+use Illuminate\Container\Container;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Str;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
+use ReflectionIntersectionType;
 use ReflectionMethod;
+use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionUnionType;
+use Throwable;
 use YasinTgh\LaravelPostman\Contracts\RouteAnalyzerInterface;
 use YasinTgh\LaravelPostman\DataTransferObjects\RouteInfoDto;
 use YasinTgh\LaravelPostman\Exceptions\RouteProcessingException;
@@ -48,13 +51,14 @@ class RouteAnalyzer implements RouteAnalyzerInterface
         try {
             $reflector = $this->getRouteReflector($route);
 
-            $formRequestType = collect($reflector->getParameters())
-                ->first(fn($parameter) => $this->isFormRequest($parameter))
-                ?->getType()
-                ?->getName();
+            $formRequestType = null;
+            foreach ($reflector->getParameters() as $parameter) {
+                if ($formRequestType = $this->resolveFormRequestClass($parameter)) {
+                    break;
+                }
+            }
 
-
-            $formRequest = $formRequestType ? new $formRequestType() : null;
+            $formRequest = $formRequestType ? $this->makeFormRequest($formRequestType, $route) : null;
 
             return new RouteInfoDto(
                 uri: $route->uri(),
@@ -67,7 +71,7 @@ class RouteAnalyzer implements RouteAnalyzerInterface
             );
         } catch (UnsupportedRouteException $e) {
             throw $e;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             throw RouteProcessingException::forReflectionFailure(
                 route: $route,
                 previous: $e,
@@ -143,7 +147,13 @@ class RouteAnalyzer implements RouteAnalyzerInterface
         }
 
         $controller = $route->getControllerClass();
-        if ($controller && in_array($controller, $this->config['routes']['exclude']['controllers'])) {
+
+        $includeControllers = $this->config['routes']['include']['controllers'] ?? [];
+        if (!empty($includeControllers) && !in_array($controller, $includeControllers, true)) {
+            return false;
+        }
+
+        if ($controller && in_array($controller, $this->config['routes']['exclude']['controllers'] ?? [], true)) {
             return false;
         }
 
@@ -160,21 +170,46 @@ class RouteAnalyzer implements RouteAnalyzerInterface
         ));
     }
 
-    private function isFormRequest(ReflectionParameter $p): bool
+    /**
+     * Returns the FormRequest class a parameter is typed with, if any.
+     * Handles named, union, intersection and DNF types.
+     */
+    private function resolveFormRequestClass(ReflectionParameter $p): ?string
     {
         $type = $p->getType();
-        if (!$type) return false;
+        if (!$type) return null;
 
-        $types = $type instanceof ReflectionUnionType
-            ? $type->getTypes()
-            : [$type];
-
-        foreach ($types as $t) {
-            if (!$t->isBuiltin() && is_subclass_of($t->getName(), FormRequest::class)) {
-                return true;
+        $pending = [$type];
+        while ($t = array_shift($pending)) {
+            if ($t instanceof ReflectionNamedType) {
+                if (!$t->isBuiltin() && is_subclass_of($t->getName(), FormRequest::class)) {
+                    return $t->getName();
+                }
+            } elseif ($t instanceof ReflectionUnionType || $t instanceof ReflectionIntersectionType) {
+                array_push($pending, ...$t->getTypes());
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * Builds a FormRequest that can run rules() outside an HTTP request:
+     * it has the container, a resolvable (empty) route and no user, but is
+     * NOT resolved through the container, which would trigger validation.
+     */
+    private function makeFormRequest(string $class, Route $route): FormRequest
+    {
+        /** @var FormRequest $request */
+        $request = new $class();
+
+        $request->setContainer(Container::getInstance());
+
+        $boundRoute = clone $route;
+        $boundRoute->parameters = [];
+        $request->setRouteResolver(fn() => $boundRoute);
+        $request->setUserResolver(fn() => null);
+
+        return $request;
     }
 }

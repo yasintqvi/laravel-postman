@@ -97,7 +97,11 @@ class RouteGrouper
     {
         $headers = $this->buildDefaultHeaders();
 
-        if ($this->isProtectedRoute($route) && $this->isApiKeyAuth()) {
+        if (
+            $this->isProtectedRoute($route)
+            && $this->isApiKeyAuth()
+            && ($this->config['auth']['location'] ?? 'header') === 'header'
+        ) {
             $headers[] = $this->buildApiKeyHeader();
         }
 
@@ -118,6 +122,12 @@ class RouteGrouper
 
     protected function isProtectedRoute(RouteInfoDto $route): bool
     {
+        // Without auth enabled the collection defines no auth variables,
+        // so request-level auth would reference undefined {{...}} values.
+        if (!($this->config['auth']['enabled'] ?? false)) {
+            return false;
+        }
+
         $authMiddleware = $this->config['auth']['protected_middleware'] ?? ['auth'];
         return !empty(array_intersect($authMiddleware, $route->middleware));
     }
@@ -174,52 +184,62 @@ class RouteGrouper
 
     protected function groupByNestedPath(array $routes): array
     {
-        $maxDepth = $this->config['structure']['folders']['max_depth'] ?? 2;
+        $maxDepth = max(0, (int) ($this->config['structure']['folders']['max_depth'] ?? 2));
         $result = [];
 
         foreach ($routes as $route) {
-            $uriWithoutPrefix = trim(str_replace($this->config['routes']['prefix'], '', $route->uri), "/");
-
-            $uriWithoutSegments = preg_replace('/\{.*?\}/', '', $uriWithoutPrefix);
-
-            $uriWithoutSegments = trim(preg_replace('/\/+/', '/', $uriWithoutSegments), "/");
-
-            if (empty($uriWithoutSegments)) {
-                $segments = [];
-            } else {
-                $segments = explode('/', $uriWithoutSegments);
-            }
+            $folders = array_slice($this->staticSegments($route->uri), 0, $maxDepth);
 
             $current = &$result;
 
-            foreach ($segments as $i => $segment) {
-                if ($i < $maxDepth) {
-                    $found = false;
-                    foreach ($current as &$item) {
-                        if (isset($item['name']) && $item['name'] === $segment) {
-                            $current = &$item['item'];
-                            $found = true;
-                            break;
-                        }
-                    }
+            foreach ($folders as $segment) {
+                $index = $this->findFolderIndex($current, $segment);
 
-                    if (!$found) {
-                        $newItem = [
-                            'name' => $segment,
-                            'item' => []
-                        ];
-                        $current[] = $newItem;
-                        $current = &$current[count($current) - 1]['item'];
-                    }
-
-                    if ($i === count($segments) - 1) {
-                        $current[] = $this->formatRoute($route);
-                    }
+                if ($index === null) {
+                    $current[] = ['name' => $segment, 'item' => []];
+                    $index = array_key_last($current);
                 }
+
+                $current = &$current[$index]['item'];
             }
+
+            // Routes deeper than max_depth land in the deepest allowed folder;
+            // routes with no static segment (e.g. "api" or "api/{locale}") land at the root.
+            $current[] = $this->formatRoute($route);
+
+            unset($current);
         }
 
         return $result;
+    }
+
+    /**
+     * URI segments after the configured prefix, without route parameters.
+     */
+    protected function staticSegments(string $uri): array
+    {
+        $uri = trim($uri, '/');
+        $prefix = trim((string) ($this->config['routes']['prefix'] ?? ''), '/');
+
+        if ($prefix !== '' && ($uri === $prefix || str_starts_with($uri, $prefix . '/'))) {
+            $uri = substr($uri, strlen($prefix));
+        }
+
+        return array_values(array_filter(
+            explode('/', $uri),
+            fn(string $segment) => $segment !== '' && !preg_match('/^\{.*\}$/', $segment)
+        ));
+    }
+
+    protected function findFolderIndex(array $items, string $name): int|string|null
+    {
+        foreach ($items as $index => $item) {
+            if (isset($item['item']) && !isset($item['request']) && ($item['name'] ?? null) === $name) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     protected function groupByController(array $routes): array

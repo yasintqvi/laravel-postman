@@ -2,6 +2,7 @@
 
 namespace YasinTgh\LaravelPostman\Services;
 
+use Illuminate\Container\Container;
 use Illuminate\Foundation\Http\FormRequest;
 use Throwable;
 
@@ -33,7 +34,12 @@ class RequestBodyGenerator
     protected function generateBodyContent(FormRequest $request, string $bodyType, array $requestConfig): array|string|null
     {
         try {
-            $rules = $request->rules();
+            // Like Laravel itself, call rules() through the container so
+            // method-injected dependencies are resolved.
+            $rules = method_exists($request, 'rules')
+                ? Container::getInstance()->call([$request, 'rules'])
+                : [];
+            $rules = is_array($rules) ? $rules : [];
         } catch (Throwable $th) {
             $rules = [];
         }
