@@ -185,7 +185,10 @@ class CollectionMerger
             $merged['request']['description'] = $remote['request']['description'];
         }
 
-        if (!isset($generated['request']['auth']) && isset($remote['request']['auth'])) {
+        // Generated "noauth" only means "public route"; auth configured on the
+        // request in Postman is a deliberate choice, so keep it.
+        $generatedAuthType = $generated['request']['auth']['type'] ?? null;
+        if (($generatedAuthType === null || $generatedAuthType === 'noauth') && isset($remote['request']['auth'])) {
             $merged['request']['auth'] = $remote['request']['auth'];
         }
 

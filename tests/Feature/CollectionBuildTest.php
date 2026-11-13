@@ -145,6 +145,17 @@ class CollectionBuildTest extends TestCase
         $this->assertArrayNotHasKey('auth', $collection);
     }
 
+    public function test_public_routes_opt_out_of_collection_auth(): void
+    {
+        Route::get('api/users', [UserController::class, 'index']);
+        Route::delete('api/users/{user}', [UserController::class, 'index'])->middleware('auth:sanctum');
+
+        $items = $this->build(['auth' => ['enabled' => true, 'type' => 'bearer']])['item'];
+
+        $this->assertSame(['type' => 'noauth'], $this->findRequest($items, 'GET')['request']['auth']);
+        $this->assertSame('bearer', $this->findRequest($items, 'DELETE')['request']['auth']['type']);
+    }
+
     public function test_api_key_auth_uses_config_and_is_not_duplicated_as_header(): void
     {
         Route::get('api/users', [UserController::class, 'index'])->middleware('auth:api');

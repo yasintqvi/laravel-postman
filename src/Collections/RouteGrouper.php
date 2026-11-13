@@ -104,6 +104,10 @@ class RouteGrouper
 
         if ($this->isProtectedRoute($route)) {
             $formatted['request']['auth'] = $this->buildRouteAuth();
+        } elseif ($this->config['auth']['enabled'] ?? false) {
+            // Postman requests inherit the collection's auth unless they set
+            // their own, so public routes must opt out explicitly.
+            $formatted['request']['auth'] = ['type' => 'noauth'];
         }
 
         return $formatted;

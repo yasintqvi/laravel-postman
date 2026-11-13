@@ -124,7 +124,7 @@ return [
         ],
 
         // Middleware that indicate protected routes
-        'protected_middleware' => ['auth:api'],
+        'protected_middleware' => ['auth', 'auth:api', 'auth:sanctum'],
     ],
 
     /*
