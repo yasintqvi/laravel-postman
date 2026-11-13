@@ -49,8 +49,9 @@ class RequestBodyGenerator
         }
 
         return match ($bodyType) {
+            // An empty body is a JSON object ({}), not a list ([]).
             'raw' => json_encode(
-                $this->generateFromRules($rules, $requestConfig),
+                $this->generateFromRules($rules, $requestConfig) ?: new \stdClass(),
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             ),
             'formdata' => $this->generateFormData($rules, $requestConfig),
